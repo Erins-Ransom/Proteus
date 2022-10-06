@@ -1,4 +1,15 @@
-# Hybrid Prefix Range Filter (HyPR)
+# Proteus: A Self Designing Range Filter
+
+We introduce Proteus, a novel self-designing approximate range filter, which configures itself based on sampled data in order to optimize its false positive rate (FPR) for a given space requirement.
+Proteus unifies the probabilistic and deterministic design spaces of state-of-the-art range filters to achieve robust performance across a larger variety of use cases.
+At the core of Proteus lies our Contextual Prefix FPR (CPFPR) model -- a formal framework for the FPR of prefix-based filters across their design spaces.
+We empirically demonstrate the accuracy of our model and Proteus' ability to optimize over both synthetic workloads and real-world datasets.
+We further evaluate Proteus in RocksDB and show that it is able to improve end-to-end performance by as much as 5.3x over more brittle state-of-the-art methods such as SuRF and Rosetta.
+Our experiments also indicate that the cost of modeling is not significant compared to the end-to-end performance gains and that Proteus is robust to workload shifts.
+
+Eric R. Knorr, Baptiste Lemaire, Andrew Lim, Siqiang Luo, Huanchen Zhang, Stratos Idreos, and Michael Mitzenmacher. 2022. Proteus: A Self-Designing Range Filter. In Proceedings of the 2022 International Conference on Management of Data (SIGMOD '22). Association for Computing Machinery, New York, NY, USA, 1670–1684. https://doi.org/10.1145/3514221.3526167
+
+arXiv [link](https://arxiv.org/abs/2207.01503). 
 
 ## RocksDB Install Dependencies
 sudo apt-get install build-essential cmake libgtest.dev liblz4-dev libzstd-dev libgflags-dev
