@@ -34,9 +34,14 @@
 *.app
 
 # Binaries
-int_workload
-str_workload
+workloads/int_workload_gen
+workloads/str_workload_gen
+workloads/process_sosd
 bench/bench
+
+# Datasets
+workloads/domains
+workloads/SOSD
 
 # RocksDB
 tmp/

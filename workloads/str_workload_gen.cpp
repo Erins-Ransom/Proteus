@@ -13,8 +13,6 @@
 #include <experimental/filesystem> // C++14 compatible
 
 static size_t DOMAIN_OFFSET = 0;
-static std::string DOMAIN_PATH = "/home/shared/HyPR/generic_org_domain/org_domain.txt";
-static size_t DOMAIN_MAX_LEN = 253 * 8;
 
 enum kdist_type {
     kuniform, knormal, kdomain
@@ -139,13 +137,13 @@ std::vector<std::string> getDomainKeys(unsigned long long nkeys, const std::stri
     return keys;
 }
 
-std::vector<std::string> generateKeys(unsigned long long klen, unsigned long long nkeys, kdist_type kdist) {
+std::vector<std::string> generateKeys(unsigned long long klen, unsigned long long nkeys, kdist_type kdist, const std::string domains_path) {
     if (kdist == kuniform) {
         return generateKeysUniform(klen, nkeys);
     } else if (kdist == knormal) {
         return generateKeysNormal(klen, nkeys);
     } else if (kdist == kdomain) {
-        return getDomainKeys(nkeys, DOMAIN_PATH);
+        return getDomainKeys(nkeys, domains_path);
     } else {
         assert(false);
     }
@@ -155,7 +153,7 @@ std::vector<std::pair<std::string, std::string>> generateRangeQueries(unsigned l
                                                                       unsigned long long min_range, unsigned long long max_range, 
                                                                       double pqratio, const std::vector<std::string>& keys, 
                                                                       qdist_type qdist, unsigned long long correlation_degree, 
-                                                                      double pnratio) {
+                                                                      double pnratio, const std::string domains_path) {
     std::vector<std::pair<std::string, std::string>> queries;
     std::vector<std::string> range_lefts;
     std::vector<std::string> range_lefts1;
@@ -170,7 +168,7 @@ std::vector<std::pair<std::string, std::string>> generateRangeQueries(unsigned l
         range_lefts1 = keys;
         range_lefts2 = generateKeysUniform(klen, nqueries / 2);
     } else if (qdist == qdomain) {
-        range_lefts = getDomainKeys(nqueries, DOMAIN_PATH);
+        range_lefts = getDomainKeys(nqueries, domains_path);
     }
 
     uint64_t range_size;
@@ -300,19 +298,18 @@ std::vector<std::pair<std::string, std::string>> generateRangeQueries(unsigned l
     return queries;
 }
 
-void writeValuesToFile(const std::vector<std::string>& v, const std::string& f, const size_t klen) {
+void writeValuesToFile(const std::vector<std::string>& v, const std::string& f) {
     std::stringstream ss;
     ss << "my_data/" << f << ".txt";
     std::ofstream output_file(ss.str(), std::ofstream::binary);
 
-    size_t kbytelen = klen / 8;
     for (const auto & s : v) {
-        output_file.write(&s[0], kbytelen);
+        output_file.write(s.data(), s.size());
     }
     output_file.close();
 }
 
-void writePairsToFile(const std::vector<std::pair<std::string, std::string>>& v, const std::string& f1, const std::string& f2, const size_t klen) {
+void writePairsToFile(const std::vector<std::pair<std::string, std::string>>& v, const std::string& f1, const std::string& f2) {
     std::stringstream ss1;
     std::stringstream ss2;
     ss1 << "my_data/" << f1 << ".txt";
@@ -320,32 +317,33 @@ void writePairsToFile(const std::vector<std::pair<std::string, std::string>>& v,
     std::ofstream output_file1(ss1.str(), std::ofstream::binary);
     std::ofstream output_file2(ss2.str(), std::ofstream::binary);
 
-    size_t kbytelen = klen / 8;
     for (const auto & p : v) {
-        output_file1.write(&p.first[0], kbytelen);
-        output_file2.write(&p.second[0], kbytelen);
+        output_file1.write(p.first.data(), p.first.size());
+        output_file2.write(p.first.data(), p.first.size());
     }
     output_file1.close();
     output_file2.close();
 }
 
 int main(int argc, char *argv[]) {
-    assert(argc == 11);
+    assert(argc == 12);
 
-    unsigned long long nkeys = strtoull(argv[1], NULL, 0);
-    unsigned long long klen = strtoull(argv[2], NULL, 0);
-    unsigned long long nqueries = strtoull(argv[3], NULL, 0);
-    unsigned long long min_range = strtoull(argv[4], NULL, 0);
-    unsigned long long max_range = strtoull(argv[5], NULL, 0);
-    assert(str_to_kdist.count(argv[6]) != 0);
-    kdist_type kdist = str_to_kdist[argv[6]];
-    assert(str_to_qdist.count(argv[7]) != 0);
-    qdist_type qdist = str_to_qdist[argv[7]];
-    double pqratio = atof(argv[8]);
-    double pnratio = atof(argv[9]);
-    unsigned long long correlation_degree = strtoull(argv[10], NULL, 0);
+    const std::string DOMAINS_PATH = argv[1];
+    unsigned long long nkeys = strtoull(argv[2], NULL, 0);
+    unsigned long long klen = strtoull(argv[3], NULL, 0);
+    unsigned long long nqueries = strtoull(argv[4], NULL, 0);
+    unsigned long long min_range = strtoull(argv[5], NULL, 0);
+    unsigned long long max_range = strtoull(argv[6], NULL, 0);
+    assert(str_to_kdist.count(argv[7]) != 0);
+    kdist_type kdist = str_to_kdist[argv[7]];
+    assert(str_to_qdist.count(argv[8]) != 0);
+    qdist_type qdist = str_to_qdist[argv[8]];
+    double pqratio = atof(argv[9]);
+    double pnratio = atof(argv[10]);
+    unsigned long long correlation_degree = strtoull(argv[11], NULL, 0);
     
     // Safety Checks
+    assert(std::experimental::filesystem::exists(DOMAINS_PATH));
     assert(klen % 8 == 0);
     assert(min_range >= 2);
     assert(min_range <= max_range);
@@ -354,18 +352,18 @@ int main(int argc, char *argv[]) {
     assert(correlation_degree >= 1);
      
     // Print out to double check
-    printf("KNum: %llu; KLen: %llu; QNum: %llu; MinR: %llu; MaxR: %llu\n\t"
+    printf("DOMAINS_PATH: %s; KNum: %llu; KLen: %llu; QNum: %llu; MinR: %llu; MaxR: %llu\n\t"
            "KDist: %s; QDist: %s; PQR: %f; PNR: %f; CorrD: %llu\n",
-            nkeys, klen, nqueries, min_range, max_range,
+            DOMAINS_PATH.c_str(), nkeys, klen, nqueries, min_range, max_range,
             kdist_names[kdist].c_str(), qdist_names[qdist].c_str(), pqratio, pnratio, correlation_degree);
 
     // Create data directory
     std::string DIR = "my_data";
     mkdir(DIR.c_str(), 0777);
     
-    std::vector<std::string> keys = generateKeys(klen, nkeys, kdist);
+    std::vector<std::string> keys = generateKeys(klen, nkeys, kdist, DOMAINS_PATH);
     std::vector<std::pair<std::string, std::string>> queries = generateRangeQueries(
-        klen, nqueries, min_range, max_range, pqratio, keys, qdist, correlation_degree, pnratio
+        klen, nqueries, min_range, max_range, pqratio, keys, qdist, correlation_degree, pnratio, DOMAINS_PATH
     );
 
     std::string kfilename = "data0";
@@ -373,15 +371,15 @@ int main(int argc, char *argv[]) {
     std::string qfilename2 = "upper_bound0";
 
     if (kdist == kdomain) {
-        writeValuesToFile(keys, kfilename, DOMAIN_MAX_LEN);
+        writeValuesToFile(keys, kfilename);
     } else {
-        writeValuesToFile(keys, kfilename, klen);
+        writeValuesToFile(keys, kfilename);
     }
 
     if (qdist == qdomain) {
-        writePairsToFile(queries, qfilename1, qfilename2, DOMAIN_MAX_LEN);
+        writePairsToFile(queries, qfilename1, qfilename2);
     } else {
-        writePairsToFile(queries, qfilename1, qfilename2, klen);
+        writePairsToFile(queries, qfilename1, qfilename2);
     }
 
     return 0;
