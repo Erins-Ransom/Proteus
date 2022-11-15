@@ -39,9 +39,9 @@ public:
         // e.g. deep trie, highly clustered keys with singular outliers
         assert(len <= 64);
 
-        if (key.length() < level || ((key.length() - level) * 8) < len) {
-            return 0;
-        }
+        // the length of the queried key should be >= the length of the stored key
+        // since we extend the queried key to the trie depth.
+        assert(!(key.length() < level || ((key.length() - level) * 8) < len));
             
         word_t suffix = 0;
         level_t num_complete_bytes = len / 8;
@@ -183,9 +183,6 @@ bool BitvectorSuffix::checkEquality(const position_t idx,
 
     word_t stored_suffix = read(bit_pos, level, trie_depth);
 
-    // if no suffix info for the stored key
-    if (stored_suffix == 0) { return true; }
-
     // the length of the queried key should be >= the length of the stored key
     // since we extend the queried key to the trie depth.
     assert(!(key.length() < level || ((key.length() - level) * 8) < suffix_len));
@@ -207,15 +204,13 @@ int BitvectorSuffix::compare(const position_t idx,
     word_t stored_suffix = read(bit_pos, level, trie_depth);
     word_t querying_suffix = constructSuffix(key, level, suffix_len);
 
-    if ((stored_suffix == 0) && (querying_suffix == 0)) {
+    if (stored_suffix == querying_suffix) {
         return kCouldBePositive;
-    } else if ((stored_suffix == 0) || (stored_suffix < querying_suffix)) {
+    } else if (stored_suffix < querying_suffix) {
         return -1;
-    } else if (stored_suffix == querying_suffix) {
-        return kCouldBePositive;
     } else {
         return 1;
-    }  
+    }
 }
 
 } // namespace proteus
