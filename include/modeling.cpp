@@ -75,8 +75,6 @@ std::vector<size_t> countUniqueKeyPrefixes(std::vector<size_t>& key_prefixes,
         key_prefixes[lcp]++;
     }
 
-    // TODO: remove this before pushing to GitHub.
-    // If this assert blows up: contact authors.
     assert(key_prefixes[0] == 1 || key_prefixes[0] == 2);
 
     for (size_t i = 1; i < key_prefixes.size() - 1; i++) {
@@ -624,6 +622,12 @@ std::tuple<size_t, size_t, size_t> modeling(const std::vector<T>& keys,
     #else
         (void) sparse_dense_cutoffs;
     #endif
+
+    // If there is enough memory for a full trie, just use it
+    if (max_trie_depth == max_klen) {
+        printf("Proteus Used Full Trie.\n");
+        return std::make_tuple(max_klen, sd_cutoffs[max_klen], 0);
+    }
 
     /*
         For each sample query, we extract the LCP of the query with the keyset and 
