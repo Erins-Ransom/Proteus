@@ -233,6 +233,7 @@ LoudsDense::LoudsDense(const SuRFBuilder* builder) {
 									height_);
 }
 
+
 template<typename T>
 bool LoudsDense::lookupKey(const T& key, PrefixBF* prefix_filter, position_t& out_node_num) const {
 	position_t node_num = 0;
@@ -252,7 +253,7 @@ bool LoudsDense::lookupKey(const T& key, PrefixBF* prefix_filter, position_t& ou
 		if (!child_indicator_bitmaps_->readBit(pos)) { 
 			return (suffixes_->checkEquality(getSuffixPos(pos), edited_key, level + 1, trie_depth_)) 
 			        && (prefix_filter == nullptr || prefix_filter->Query(key));
-		} 
+		}
 		
 		node_num = getChildNodeNum(pos);
     }
@@ -473,7 +474,7 @@ int LoudsDense::Iter::compare(const T& key, PrefixBF* prefix_filter) const {
 
 		bool res;
 		if (std::is_same<T, std::string>::value) {
-			res = prefix_filter->Query(iter_key, key);
+			res = prefix_filter->Query(iter_key, skey);
 		} else if (std::is_same<T, uint64_t>::value) {
 			res = prefix_filter->Query(stringToUint64(iter_key), integerify(key));
 		} else {

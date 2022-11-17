@@ -509,7 +509,7 @@ int LoudsSparse::Iter::compare(const T& key, PrefixBF* prefix_filter, const std:
 
 	bool res;
 	if (std::is_same<T, std::string>::value) {
-		res = prefix_filter->Query(left_query, key);
+		res = prefix_filter->Query(left_query, str_key);
 	} else if (std::is_same<T, uint64_t>::value) {
 		res = prefix_filter->Query(stringToUint64(left_query), integerify(key));
 	} else {

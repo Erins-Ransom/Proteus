@@ -61,9 +61,8 @@ public:
             const size_t sparse_dense_cutoff, const size_t prefix_length, const double bpk) : 
             prefix_filter(nullptr), trie_depth_(trie_depth), sparse_dense_cutoff_(sparse_dense_cutoff) {
         
-        // TODO: Add support for full trie later
         if (std::is_same<T, uint64_t>::value) {
-            assert(trie_depth < 64); 
+            assert(trie_depth <= 64); 
         }
         
         assert(sparse_dense_cutoff * 8 < trie_depth + 8);
@@ -79,7 +78,7 @@ public:
             
             // Initialize prefix filter if there are sufficient bits
             size_t bits_used = (trieSerializedSize() + sizeof(uint32_t) + sizeof(char)) * 8;
-            if (bits_used < total_bits && prefix_length > 0) {
+            if (bits_used < total_bits && (prefix_length > 0 && trie_depth < 64)) {
                 prefix_filter = new PrefixBF(prefix_length, total_bits - bits_used, keys);
             }
         } else if (prefix_length > 0) {
@@ -230,7 +229,8 @@ bool Proteus::Query(const T& key) const {
     position_t connect_node_num = 0;
     if (validLoudsDense() && !louds_dense_->lookupKey(key, prefix_filter, connect_node_num)) {
         return false;
-    } else if (validLoudsSparse()) {
+    } else if (connect_node_num != 0) {
+        assert(validLoudsSparse());
         return louds_sparse_->lookupKey(key, prefix_filter, connect_node_num);
     }
 
@@ -294,9 +294,15 @@ bool Proteus::Query(const T& left_key, const T& right_key) {
 
     // Return true if prefix filter query returns true or 
     // if there is a key prefix between the two query bounds
-    std::string rk = prefix_filter != nullptr ? editAndStringify(right_key, prefix_filter->getPrefixLen(), true) : stringify(right_key);
-    int compare = iter_.compare(rk, validLoudsDense(), validLoudsSparse(), prefix_filter);    
-    return (compare == kCouldBePositive) || (compare < 0);
+    T rk = prefix_filter != nullptr ? editKey(right_key, prefix_filter->getPrefixLen(), true) : right_key;
+    int compare = iter_.compare(rk, validLoudsDense(), validLoudsSparse(), prefix_filter);
+    if (std::is_same<T, uint64_t>::value) {
+        // If Proteus is a full trie, we know we are comparing full keys for integers and hence
+        // we shouldn't return a positive if the right query bound is matched in the trie. 
+        return (compare == kCouldBePositive && trie_depth_ != 64) || (compare < 0);
+    } else {
+        return (compare == kCouldBePositive) || (compare < 0);
+    }
 }
 
 uint64_t Proteus::trieSerializedSize() const {
