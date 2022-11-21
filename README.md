@@ -11,49 +11,48 @@ Eric R. Knorr, Baptiste Lemaire, Andrew Lim, Siqiang Luo, Huanchen Zhang, Strato
 
 [arXiv link](https://arxiv.org/abs/2207.01503)
 
+
+Note: This code has been updated with several modeling optimizations since the release of the paper. Experimental results may differ but should be no worse than reported in the paper.
+
+
 ## Directory Layout
 `include/` - contains all the files necessary to the implementation of the Proteus filter and the CPFPR model.
 
 `bench/` - contains all the files used for in-memory standalone filter benchmarks.
 
-`rocksdb/` - contains a modified version of RockDB with Proteus and SuRF integrated.
+`workloads/` - contains all the files used for generating synthetic workloads and downloading rreal-world datasets.
+
+`rocksdb/` - contains a modified version of RockDB with Proteus and SuRF integrated (To be Released).
 
 `SuRF/` - git submodule containing the SuRF repository. 
 
-## Setup Instructions
+## Requirements
+
+- `jq` (to download Internet domains dataset)
+- (RocksDB) `CMake`, `gtest`, `lz4`, `gflags`, `zstandard`
+
+```	
+# For Ubuntu
+sudo apt-get install jq build-essential cmake libgtest.dev liblz4-dev libzstd-dev libgflags-dev
+```
+
+## Setup
 
 Note: use either the `--recursive` parameter when cloning the repositiory or use the `submodule update` command in order to clone the SuRF submodule.  
 
+
 	git clone --recursive https://github.com/Eric-R-Knorr/Proteus.git
-	make workload
+	cd Proteus/workloads
+	./setup.sh
+
+	
+`setup.sh` - compiles string and integer workload generators and retrieves real-world datasets - `books_800M_uint64` and `fb_200M_uint64` from https://github.com/learnedsystems/SOSD, `.org` domains from https://domainsproject.org/
 
 
-# Standalone Filter Benchmarks
+# Standalone In-Memory Filter Benchmarks
 
-Configure the workload setup in `bench.sh`.
+Configure the workload setup as detailed in `bench.sh`.
 
-	cd bench
+	cd Proteus/bench
 	make bench
-	./bench.sh {bench_type} > bench.txt  # bench_type = 0 for INT or 1 for STRING workload
-
-# RocksDB Benchmarks
-
-## RocksDB Install Dependencies
-	sudo apt-get install build-essential cmake libgtest.dev liblz4-dev libzstd-dev libgflags-dev
-	cd /usr/src/gtest
-	sudo cmake CMakeLists.txt
-	sudo make
-	sudo cp *.a /usr/lib
-
-## RocksDB Build (in `rocksdb/`)
-	mkdir build
-	cd build
-	cmake -DCMAKE_BUILD_TYPE=Release -DWITH_LZ4=ON -DWITH_ZSTD=ON ..
-	make -j$(nproc) filter_experiment
-
-	# OR to enable Address Sanitizers and Debug Info
-
-	mkdir build_asan
-	cd build_asan
-	cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DWITH_LZ4=ON -DWITH_ZSTD=ON -DWITH_ASAN=ON ..
-	make -j$(nproc) filter_experiment
+	./bench.sh &> bench.txt
