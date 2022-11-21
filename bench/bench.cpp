@@ -22,6 +22,14 @@ static double bpk;
 static bool use_Proteus;
 static bool use_SuRF;
 
+inline bool isPointQuery(const uint64_t& a, const uint64_t& b) {
+    return b == (a + 1);
+}
+
+inline bool isPointQuery(const std::string& a, const std::string& b) {
+    return b == a;
+}
+
 template<typename T>
 void runExperiment(std::vector<T>& keys,
                    std::set<T>& keyset,
@@ -83,23 +91,25 @@ void runExperiment(std::vector<T>& keys,
         bool filterAns = true;
         
         if (use_Proteus) {
-            if (queries[i].first == queries[i].second) {
+            if (isPointQuery(queries[i].first, queries[i].second)) {
                 filterAns = proteus->Query(queries[i].first);
             } else {
                 filterAns = proteus->Query(queries[i].first, queries[i].second);
             }
         } else if (use_SuRF) {
-            if (squeries[i].first == squeries[i].second) {
+            if (isPointQuery(queries[i].first, queries[i].second)) {
                 filterAns = surf->lookupKey(squeries[i].first);
             } else {
-                filterAns = surf->lookupRange(squeries[i].first, true, squeries[i].second, true);
+                filterAns = is_int_bench ? surf->lookupRange(squeries[i].first, true, squeries[i].second, false)
+                                         : surf->lookupRange(squeries[i].first, true, squeries[i].second, true);
             }
         }
 
         auto it = keyset.lower_bound(queries[i].first);
-        if (it != keyset.end() && (*it) <= queries[i].second) {
-            full = true;
-        }
+        full = it != keyset.end() &&
+               ((is_int_bench && (*it) < queries[i].second)||
+                (!is_int_bench && (*it) <= queries[i].second));
+
         if (!full) {
             ++empty;
             if (filterAns) {
@@ -120,7 +130,7 @@ void runExperiment(std::vector<T>& keys,
     begin = clock();
     if (use_Proteus) {
         for (size_t i = 0; i < queries.size(); i++) {
-            if (queries[i].first == queries[i].second) {
+            if (isPointQuery(queries[i].first, queries[i].second)) {
                 res = proteus->Query(queries[i].first);
             } else {
                 res = proteus->Query(queries[i].first, queries[i].second);
@@ -129,10 +139,11 @@ void runExperiment(std::vector<T>& keys,
         }
     } else if (use_SuRF) {
         for (size_t i = 0; i < squeries.size(); i++) {
-            if (squeries[i].first == squeries[i].second) {
+            if (isPointQuery(queries[i].first, queries[i].second)) {
                 res = surf->lookupKey(squeries[i].first);
             } else {
-                res = surf->lookupRange(squeries[i].first, true, squeries[i].second, true);
+                res = is_int_bench ? surf->lookupRange(squeries[i].first, true, squeries[i].second, false)
+                                   : surf->lookupRange(squeries[i].first, true, squeries[i].second, true);
             }
             sum += 1 ? res : 0;
         }
@@ -206,8 +217,8 @@ int main(int argc, char **argv) {
         std::vector<std::pair<std::string, std::string>> queries;
         std::vector<std::pair<std::string, std::string>> sample_queries;
 
-        proteus::strLoadKeys(keyFilePath, keys, keyset, keylen / 8, nkeys);
-        proteus::strLoadQueries(lQueryFilePath, uQueryFilePath, queries, keylen / 8, nqueries);
+        keylen = proteus::strLoadKeys(keyFilePath, keys, keyset, nkeys) * 8;
+        proteus::strLoadQueries(lQueryFilePath, uQueryFilePath, queries, nqueries);
         
         if (use_Proteus) {
             sample_queries = proteus::sampleQueries(queries, sample_rate);

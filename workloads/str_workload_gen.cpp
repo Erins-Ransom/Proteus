@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <sys/stat.h>
 #include <chrono>
+#include <algorithm>
 #include <experimental/filesystem> // C++14 compatible
 
 static size_t DOMAIN_OFFSET = 0;
@@ -153,7 +154,7 @@ std::vector<std::pair<std::string, std::string>> generateRangeQueries(unsigned l
                                                                       unsigned long long min_range, unsigned long long max_range, 
                                                                       double pqratio, const std::vector<std::string>& keys, 
                                                                       qdist_type qdist, unsigned long long correlation_degree, 
-                                                                      double pnratio, const std::string domains_path) {
+                                                                      double pnratio, const std::string domains_path, size_t max_klen) {
     std::vector<std::pair<std::string, std::string>> queries;
     std::vector<std::string> range_lefts;
     std::vector<std::string> range_lefts1;
@@ -188,37 +189,33 @@ std::vector<std::pair<std::string, std::string>> generateRangeQueries(unsigned l
         std::mt19937 gen2(rd2());
         std::uniform_int_distribution<uint64_t> uni_dist2(0, index2);
 
-        // Change Query Composition Here
-        uint64_t nqueries1 = nqueries / 2; // Short-Range Correlated
-        uint64_t nqueries2 = nqueries / 2; // Long-Range Uniform
+        double pqratio_corr = pqratio <= 0.5 ? pqratio * 2.0 : 1.0;
+        double pqratio_unif = pqratio <= 0.5 ? 0.0 : (pqratio - 0.5) * 2.0;
         
-        uint64_t min_range_size1 = 2;
-        uint64_t max_range_size1 = 32;
-        uint64_t max_correlation_degree1 = 1024;
+        // Correlated Queries
+        std::random_device rd_corr;
+        std::mt19937 gen_corr(rd_corr());
+        std::uniform_int_distribution<uint64_t> corr_dist(1, correlation_degree);
 
-        std::random_device rd_corr1;
-        std::mt19937 gen_corr1(rd_corr1());
-        std::uniform_int_distribution<uint64_t> uni_dist_corr1(1, max_correlation_degree1);
-        
-        uint64_t min_range_size2 = 1073741824;
-        uint64_t max_range_size2 = 2147483648;
-
-        for (uint64_t i = 0; i < nqueries1; i++) {
-            double random_from_zero_to_one = uni_dist1(gen1) * 1.0 / (range_lefts1.size() - 1);
-            if (random_from_zero_to_one < pnratio) {
-                left = lex_arithmetic(keys[uni_dist1(gen1)], -1);
-            } else {
-                left = lex_arithmetic(range_lefts1[uni_dist1(gen1)], uni_dist_corr1(gen_corr1));
-            }
-
-            // Generate query range
-            random_from_zero_to_one = uni_dist1(gen1) * 1.0 / (range_lefts1.size() - 1);
-            if (random_from_zero_to_one < pqratio) {
+        for (uint64_t i = 0; i < nqueries / 2; i++) {
+            // Generate range query size
+            double randdbl = uni_dist1(gen1) * 1.0 / (range_lefts1.size() - 1);
+            if (randdbl < pqratio_corr) {
                 range_size = 1;
+            } else if (min_range == max_range) {
+                range_size = 2;
             } else {   
-                range_size = (rand() % (max_range_size1 - min_range_size1)) + min_range_size1;
-                if (range_size < 2) range_size = 2; // minimum range size is 2
+                range_size = (rand() % (max_range - min_range)) + std::max(2ULL, min_range);
             }
+            
+            // Generate left query bound
+            randdbl = uni_dist1(gen1) * 1.0 / (range_lefts1.size() - 1);
+            if (randdbl < pnratio) {
+                left = range_size > 1 ? lex_arithmetic(keys[uni_dist1(gen1)], -1) : keys[uni_dist1(gen1)];
+            } else {
+                left = lex_arithmetic(range_lefts1[uni_dist1(gen1)], corr_dist(gen_corr));
+            }
+
             right = lex_arithmetic(left, range_size - 1);
             if ((left.length() != 0) && (right.length() != 0)) {
                 assert(left <= right);
@@ -226,27 +223,32 @@ std::vector<std::pair<std::string, std::string>> generateRangeQueries(unsigned l
             }
         }
 
-        for (uint64_t i = 0; i < nqueries2; i++) {
-            double random_from_zero_to_one = uni_dist2(gen2) * 1.0 / (range_lefts2.size() - 1);
-            if (random_from_zero_to_one < pnratio) {
-                left = lex_arithmetic(keys[uni_dist2(gen2)], -1);
+        // Uniform Queries
+        for (uint64_t i = 0; i < nqueries / 2; i++) {
+            // Generate range query size
+            double randdbl = uni_dist2(gen2) * 1.0 / (range_lefts2.size() - 1);
+            if (randdbl < pqratio_unif) {
+                range_size = 1;
+            } else if (min_range == max_range) {
+                range_size = 2;
             } else {
-                left = range_lefts2[uni_dist2(gen2)];
+                range_size = (rand() % (max_range - min_range)) + std::max(2ULL, min_range);
             }
 
-            // Generate query range
-            random_from_zero_to_one = uni_dist2(gen2) * 1.0 / (range_lefts2.size() - 1);
-            if (random_from_zero_to_one < pqratio) {
-                range_size = 1;
-            } else {   
-                range_size = (rand() % (max_range_size2 - min_range_size2)) + min_range_size2;
-                if (range_size < 2) range_size = 2; // minimum range size is 2
+            // Generate left query bound
+            randdbl = uni_dist2(gen2) * 1.0 / (range_lefts2.size() - 1);
+            if (randdbl < pnratio) {
+                left = range_size > 1 ? lex_arithmetic(keys[uni_dist2(gen2)], -1) : keys[uni_dist2(gen2)];
+            } else {
+                left = range_lefts2[uni_dist2(gen2)];
             }
         
             right = lex_arithmetic(left, range_size - 1);
             if ((left.length() != 0) && (right.length() != 0)) {
                 assert(left <= right);
                 queries.push_back(std::pair<std::string, std::string>(left, right));
+            } else {
+                std::cout << left.length() << ";"<< right.length() << ";"<< range_size << std::endl;
             }
         }
     } else {
@@ -259,23 +261,30 @@ std::vector<std::pair<std::string, std::string>> generateRangeQueries(unsigned l
         std::uniform_int_distribution<uint64_t> corr_dist(1, correlation_degree);
 
         for (uint64_t i = 0; i < nqueries; i++) {
-            double rand1 = index_dist(gen) * 1.0 / index;
-            if (rand1 < pnratio) {
-                left = lex_arithmetic(keys[index_dist(gen)], -1);
+            // Generate range query size
+            double randdbl = index_dist(gen) * 1.0 / index;
+            if (randdbl < pqratio) {
+                range_size = 1;
+            } else if (min_range == max_range) {
+                range_size = 2;
+            } else {
+                range_size = (rand() % (max_range - min_range)) + std::max(2ULL, min_range);
+            }
+
+            randdbl = index_dist(gen) * 1.0 / index;
+            if (randdbl < pnratio) {
+                left = range_size > 1 ? lex_arithmetic(keys[index_dist(gen)], -1) : keys[index_dist(gen)];
             } else {
                 if (qdist == qcorrelated) {
                     left = lex_arithmetic(range_lefts[index_dist(gen)], corr_dist(gen_corr));
+                } else if (qdist == qdomain) {
+                    // Resize domain query bounds to maximum length in key set
+                    std::string resized_left = range_lefts[index_dist(gen)];
+                    resized_left.resize(max_klen, '\0');
+                    left = resized_left;
                 } else {
                     left = range_lefts[index_dist(gen)];
-                }      
-            }
-
-            double rand2 = index_dist(gen) * 1.0 / index;
-            if (rand2 < pqratio) {
-                range_size = 1;
-            } else {   
-                range_size = (rand() % (max_range - min_range)) + min_range;
-                if (range_size < 2) range_size = 2; // minimum range size is 2
+                }
             }
             
             // minus 1 because for strings we include the right query bound
@@ -298,18 +307,19 @@ std::vector<std::pair<std::string, std::string>> generateRangeQueries(unsigned l
     return queries;
 }
 
-void writeValuesToFile(const std::vector<std::string>& v, const std::string& f) {
+void writeValuesToFile(const std::vector<std::string>& v, const uint32_t max_klen, const std::string& f) {
     std::stringstream ss;
     ss << "my_data/" << f << ".txt";
     std::ofstream output_file(ss.str(), std::ofstream::binary);
 
+    output_file.write(reinterpret_cast<const char*>(&max_klen), sizeof(uint32_t));
     for (const auto & s : v) {
-        output_file.write(s.data(), s.size());
+        output_file.write(s.data(), max_klen);
     }
     output_file.close();
 }
 
-void writePairsToFile(const std::vector<std::pair<std::string, std::string>>& v, const std::string& f1, const std::string& f2) {
+void writePairsToFile(const std::vector<std::pair<std::string, std::string>>& v, const uint32_t max_klen, const std::string& f1, const std::string& f2) {
     std::stringstream ss1;
     std::stringstream ss2;
     ss1 << "my_data/" << f1 << ".txt";
@@ -317,9 +327,11 @@ void writePairsToFile(const std::vector<std::pair<std::string, std::string>>& v,
     std::ofstream output_file1(ss1.str(), std::ofstream::binary);
     std::ofstream output_file2(ss2.str(), std::ofstream::binary);
 
+    output_file1.write(reinterpret_cast<const char*>(&max_klen), sizeof(uint32_t));
+    output_file2.write(reinterpret_cast<const char*>(&max_klen), sizeof(uint32_t));
     for (const auto & p : v) {
-        output_file1.write(p.first.data(), p.first.size());
-        output_file2.write(p.first.data(), p.first.size());
+        output_file1.write(p.first.data(), max_klen);
+        output_file2.write(p.second.data(), max_klen);
     }
     output_file1.close();
     output_file2.close();
@@ -362,25 +374,26 @@ int main(int argc, char *argv[]) {
     mkdir(DIR.c_str(), 0777);
     
     std::vector<std::string> keys = generateKeys(klen, nkeys, kdist, DOMAINS_PATH);
+
+    // Max Key Length in bytes
+    size_t max_klen = klen / 8;
+    if (kdist == kdomain) {
+        auto max = std::max_element(keys.begin(), keys.end(), [](const auto& s1, const auto& s2){
+            return s1.size() < s2.size();
+        });
+        max_klen = (*max).size();
+    }
+
     std::vector<std::pair<std::string, std::string>> queries = generateRangeQueries(
-        klen, nqueries, min_range, max_range, pqratio, keys, qdist, correlation_degree, pnratio, DOMAINS_PATH
+        klen, nqueries, min_range, max_range, pqratio, keys, qdist, correlation_degree, pnratio, DOMAINS_PATH, max_klen
     );
 
     std::string kfilename = "data0";
     std::string qfilename1 = "txn0";
     std::string qfilename2 = "upper_bound0";
 
-    if (kdist == kdomain) {
-        writeValuesToFile(keys, kfilename);
-    } else {
-        writeValuesToFile(keys, kfilename);
-    }
-
-    if (qdist == qdomain) {
-        writePairsToFile(queries, qfilename1, qfilename2);
-    } else {
-        writePairsToFile(queries, qfilename1, qfilename2);
-    }
+    writeValuesToFile(keys, max_klen, kfilename);
+    writePairsToFile(queries, max_klen, qfilename1, qfilename2);
 
     return 0;
 }

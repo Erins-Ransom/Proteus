@@ -72,44 +72,52 @@ void intLoadQueries(std::string lQueryFilePath,
 }
 
 
-void strLoadKeys(std::string keyFilePath,
-                 std::vector<std::string>& skeys,
-                 std::set<std::string>& keyset,
-                 const size_t keylen,
-                 const size_t nkeys) {
+size_t strLoadKeys(std::string keyFilePath,
+                   std::vector<std::string>& skeys,
+                   std::set<std::string>& keyset,
+                   const size_t nkeys) {
     
     std::ifstream keyFile(keyFilePath, std::ifstream::binary);
-    char* c_arr = new char[keylen];
+    uint32_t sz;
+    keyFile.read(reinterpret_cast<char*>(&sz), sizeof(uint32_t));
+
+    char* k_arr = new char[sz];
     for (size_t i = 0; i < nkeys; i++) {
-        keyFile.read(c_arr, keylen);
-        keyset.insert(std::string(c_arr, keylen));
-        skeys.push_back(std::string(c_arr, keylen)); 
+        keyFile.read(k_arr, sz);
+        keyset.insert(std::string(k_arr, sz));
+        skeys.push_back(std::string(k_arr, sz)); 
     }
 
     keyFile.close();
 
     std::sort(skeys.begin(), skeys.end());
-    delete[] c_arr;
+    delete[] k_arr;
+
+    return static_cast<size_t>(sz);
 }
 
 void strLoadQueries(std::string lQueryFilePath, 
                     std::string rQueryFilePath,
                     std::vector<std::pair<std::string, std::string>>& squeries,
-                    const size_t keylen, 
                     const size_t nqueries) {
     
     std::ifstream lQueryFile(lQueryFilePath, std::ifstream::binary);
     std::ifstream rQueryFile(rQueryFilePath, std::ifstream::binary);
     
+    uint32_t lsz, rsz;
+    lQueryFile.read(reinterpret_cast<char*>(&lsz), sizeof(uint32_t));
+    rQueryFile.read(reinterpret_cast<char*>(&rsz), sizeof(uint32_t));
+    assert(lsz == rsz);
+
     std::string lq, rq;
-    char* clq_arr = new char[keylen];
-    char* crq_arr = new char[keylen];
+    char* lq_arr = new char[lsz];
+    char* rq_arr = new char[rsz];
 
     for (size_t i = 0; i < nqueries; i++) {
-        lQueryFile.read(clq_arr, keylen);
-        rQueryFile.read(crq_arr, keylen);
-        lq = std::string(clq_arr, keylen);
-        rq = std::string(crq_arr, keylen);
+        lQueryFile.read(lq_arr, lsz);
+        rQueryFile.read(rq_arr, rsz);
+        lq = std::string(lq_arr, lsz);
+        rq = std::string(rq_arr, rsz);
         assert(lq <= rq);
         squeries.push_back(std::make_pair(lq, rq));
     }
@@ -118,8 +126,8 @@ void strLoadQueries(std::string lQueryFilePath,
     rQueryFile.close();
 
     std::sort(squeries.begin(), squeries.end());
-    delete[] clq_arr;
-    delete[] crq_arr;
+    delete[] lq_arr;
+    delete[] rq_arr;
 }
 
 }

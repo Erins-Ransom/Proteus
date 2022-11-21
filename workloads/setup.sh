@@ -15,11 +15,8 @@ function main() {
    download_file_zst books_800M_uint64 8708eb3e1757640ba18dcd3a0dbb53bc https://www.dropbox.com/s/y2u3nbanbnbmg7n/books_800M_uint64.zst?dl=1
    download_file_zst fb_200M_uint64 3b0f820caa0d62150e87ce94ec989978 https://dataverse.harvard.edu/api/access/datafile/:persistentId?persistentId=doi:10.7910/DVN/JGVF9A/EATHF7
    
-   echo "Processing SOSD Datasets..."
-   cd .. && process_sosd
-
    echo "Downloading Domains Dataset..."
-   cd domains && download_org_domains
+   cd ../domains && download_org_domains
    
    echo "Processing Domains Dataset..."
    process_org_domains   

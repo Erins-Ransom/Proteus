@@ -1,11 +1,27 @@
 #!/bin/bash
 
+# Reference: https://sharats.me/posts/shell-script-best-practices/)
+
+# Exit if a command fails  
+set -o errexit
+
+# Throw error when accessing an unset variable
+set -o nounset
+
+# Enable debug mode with TRACE=1 ./bench.sh
+if [[ "${TRACE-0}" == "1" ]]; then
+    set -o xtrace
+fi
+
+# Change to directory of this script
+cd "$(dirname "$0")"
+
 ###############################################
 ###########   WORKLOAD PARAMETERS   ###########
 ###############################################
 
-## NOTE: paired values
-#  By default, we loop through all combinations of parameters, but paired values 
+## NOTE: LINKED PARAMETERS
+#  By default, we loop through all combinations of parameters, but linked parameters 
 #  are considered as a single parameter.  i.e. 
 #
 #       kdist_arr=("kuniform" "kuniform")
@@ -15,53 +31,89 @@
 #  uniform queries and the other with correlated queries.
 
 
-## Key Length (in bits)
+## 1. Key Length (in bits)
+#######################################
 # For integer workloads, this value MUST be 64
 # For synthetic string workloads, this value MUST be a multiple of 8
 # For the string domain workload, this value is ignored.
 
-keylen_arr=(64) # int
-# keylen_arr=(1440) # str
 
-## Number of Keys and Queries [PAIRED]
-nkeys_arr=(10000000)
-nqrys_arr=(1000000) 
+## 2. Number of Keys
+## 3. Number of Queries
+#######################################
 
-## Key and Query Distribution [PAIRED]
 
+## [LINKED]
+## 4. Key Distribution
+## 5. Query Distribution
+#######################################
 # For SOSD / Domain workloads, please download the relevant datasets and follow the instructions in the README
 # SOSD and Domain Key and Query Distributions must be specified together, e.g. ksosd_books + qsosd_books
-
 # Integer Key Distributions: kuniform, knormal, ksosd_books, ksosd_fb
 # Integer Query Distributions: quniform, qnormal, qcorrelated, qsplit, qsosd_books, qsosd_fb
-
 # String Key Distributions: kuniform, knormal, kdomain
 # String Query Distributions: quniform, qcorrelated, qsplit, qdomain
 
-kdist_arr=("kuniform" "kuniform" "knormal" "knormal" "knormal")
-qdist_arr=("quniform" "qcorrelated" "qsplit" "qcorrelated" "quniform")
 
-## Min and Max Range Size [PAIRED]
+## [LINKED]
+## 6. Minimum Range Size
+## 7. Maximum Range Size
+## 8. Point / Range Query Ratio
+#######################################
 # Min Range Size must be >= 2
-minrange_arr=(2) 
-maxrange_arr=(4096)     # int
-# maxrange_arr=(1073741824)   # str
-
-## Point / Range Query Ratio
-# Must be >= 0.0 && <= 1.0
+# Point / Range Query Ratio must be >= 0.0 && <= 1.0
 # Use 0.0 for all range queries and 1.0 for all point queries
-pqratio_arr=(0.0)
+# For qsplit and pqratio <= 0.5, all point queries are assigned to the correlated distribution.
+# For qsplit and pqratio > 0.5, half the workload comprises correlated point queries and the 
+# remaining point queries are assigned to the uniform distribution.
 
-## Positive / Negative Query Ratio
+
+## 9. Positive / Negative Query Ratio
+#######################################
 # Must be >= 0.0 && <= 1.0
 # Use 0.0 for all negative queries and 1.0 for all positive queries
-pnratio_arr=(0.0) 
 
-## Query Correlation Degree
+
+## 10. Query Correlation Degree
+#######################################
 # The distance between the left query bound and a key is uniformly distributed between 1 and the specified value
 # Must be >= 1
-corrd_arr=(1024)    # int
-# corrd_arr=(536870912)   # str
+
+
+### INTEGER
+
+# IS_INT_BENCH="1"
+# keylen_arr=(64)
+# nkeys_arr=(10000000)
+# nqrys_arr=(1000000)
+# kdist_arr=("ksosd_fb" "ksosd_books" "kuniform" "kuniform" "knormal" "knormal" "knormal")
+# qdist_arr=("qsosd_fb" "qsosd_books" "quniform" "qcorrelated" "qsplit" "qcorrelated" "quniform")
+# minrange_arr=(2 2 2 2) 
+# maxrange_arr=(2 32 4096 1024) 
+# pqratio_arr=(1.0 0.0 0.0 0.5)
+# pnratio_arr=(0.0)
+# corrd_arr=(1024)
+
+### STRING
+
+IS_INT_BENCH="0"
+keylen_arr=(1440)
+nkeys_arr=(10000000)
+nqrys_arr=(1000000)
+kdist_arr=("kuniform" "knormal" "kuniform" "kdomain")
+qdist_arr=("quniform" "qcorrelated" "qcorrelated" "qdomain")
+minrange_arr=(2) 
+maxrange_arr=(1073741824) 
+pqratio_arr=(0.0)
+pnratio_arr=(0.0)
+corrd_arr=(536870912)
+
+
+if [[ "${IS_INT_BENCH}" == "1" ]]; then
+    echo -e "Running Integer Benchmark"
+else
+    echo -e "Running String Benchmark"
+fi
 
 
 ###############################################
@@ -72,45 +124,44 @@ corrd_arr=(1024)    # int
 ### Proteus
 
 ## Filter Bits-per-Key
+#######################################
 # Must be a positive real number
-membudg_arr=(8 10 12 14 16 18)
+membudg_arr=(8 10 12 14 16 18 20)
 
-## Determines the proportion of queries given to Proteus as a sample
+## Sample Rate
+#######################################
+# Determines the proportion of queries given to Proteus as a sample
 # Must be >= 0.0 && <= 1.0
 # Default sample size for in-memory benchmarks is 20K, see paper for sample size justification
 samplerate_arr=(0.02)
 
-### SuRF 
+
+### SuRF
 
 ## Hash and Real Suffix Lengths
+#####################################
 # These values must be non-negative integers and they control SuRF's memory usage.
 # Hash suffixes are only useful for point queries 
 surfhlen_arr=(0)
-surfrlen_arr=(2)
+surfrlen_arr=(0 2 4 6 8 10)
 
 
 ################################################################
 
 REPO_DIR="$(pwd)"
 SOSD_DIR="$REPO_DIR/../workloads/SOSD/"
-DOMAINS_DIR="$REPO_DIR/../workloads/domains/"
+DOMAINS="$REPO_DIR/../workloads/domains/domains.txt"
+DOMAINS_SHUFFLED="$REPO_DIR/../workloads/domains/shuf.txt"
 INT_WORKL_BIN="$REPO_DIR/../workloads/int_workload_gen"
 STR_WORKL_BIN="$REPO_DIR/../workloads/str_workload_gen"
 EXP_BIN="$REPO_DIR/bench"
-
-IS_INT_BENCH="$1"
-if [ $IS_INT_BENCH = "1" ]; then
-    echo -e "Running Integer Benchmark"
-else
-    echo -e "Running String Benchmark"
-fi
 
 experiment() {
     filter=$1 && shift
 
     cd "$expdir"
     touch ./experiment_result
-    if [ $IS_INT_BENCH = "1" ]; then
+    if [[ "${IS_INT_BENCH}" == "1" ]]; then
         echo -e "### BEGIN INTEGER EXPERIMENT ###" >> ./experiment_result
     else
         echo -e "### BEGIN STRING EXPERIMENT ###" >> ./experiment_result
@@ -132,8 +183,12 @@ experiment() {
         echo "$filter" "$INT_WORKL_BIN" "$SOSD_DIR" "$nkeys" "$nqrys" "$minrange" "$maxrange" "$kdist" "$qdist" "$pqratio" "$pnratio" "$corrd"
         $INT_WORKL_BIN "$SOSD_DIR" "$nkeys" "$nqrys" "$minrange" "$maxrange" "$kdist" "$qdist" "$pqratio" "$pnratio" "$corrd"
     else
-        echo "$filter" "$STR_WORKL_BIN" "$DOMAINS_DIR" "$nkeys" "$keylen" "$nqrys" "$minrange" "$maxrange" "$kdist" "$qdist" "$pqratio" "$pnratio" "$corrd"
-        $STR_WORKL_BIN "$DOMAINS_DIR" "$nkeys" "$keylen" "$nqrys" "$minrange" "$maxrange" "$kdist" "$qdist" "$pqratio" "$pnratio" "$corrd"
+        # Shuffle domains on every run
+        if [ $kdist = "kdomain" ]; then
+            cat $DOMAINS | shuf -n $(($nkeys + $nqrys)) -o $DOMAINS_SHUFFLED
+        fi
+        echo "$filter" "$STR_WORKL_BIN" "$DOMAINS_SHUFFLED" "$nkeys" "$keylen" "$nqrys" "$minrange" "$maxrange" "$kdist" "$qdist" "$pqratio" "$pnratio" "$corrd"
+        $STR_WORKL_BIN "$DOMAINS_SHUFFLED" "$nkeys" "$keylen" "$nqrys" "$minrange" "$maxrange" "$kdist" "$qdist" "$pqratio" "$pnratio" "$corrd"
     fi
     
     if [ $filter = "SuRF" ]; then
@@ -163,7 +218,6 @@ for keylen in "${keylen_arr[@]}"; do
 for nqrys in "${nqrys_arr[@]}"; do
 for i in "${!kdist_arr[@]}"; do
 for j in "${!minrange_arr[@]}"; do
-for pqratio in "${pqratio_arr[@]}"; do
 for membudg in "${membudg_arr[@]}"; do
 for corrd in "${corrd_arr[@]}"; do
 for pnratio in "${pnratio_arr[@]}"; do
@@ -173,11 +227,11 @@ kdist="${kdist_arr[$i]}"
 qdist="${qdist_arr[$i]}"
 minrange="${minrange_arr[$j]}"
 maxrange="${maxrange_arr[$j]}"
+pqratio="${pqratio_arr[$j]}"
 
 expdir=$(mktemp -d /tmp/proteus_exp.XXXXXXX)
 experiment "Proteus"
 
-done
 done
 done
 done
@@ -195,7 +249,6 @@ for keylen in "${keylen_arr[@]}"; do
 for nqrys in "${nqrys_arr[@]}"; do
 for i in "${!kdist_arr[@]}"; do
 for j in "${!minrange_arr[@]}"; do
-for pqratio in "${pqratio_arr[@]}"; do
 for corrd in "${corrd_arr[@]}"; do
 for pnratio in "${pnratio_arr[@]}"; do
 for surfhlen in "${surfhlen_arr[@]}"; do
@@ -205,12 +258,11 @@ kdist="${kdist_arr[$i]}"
 qdist="${qdist_arr[$i]}"
 minrange="${minrange_arr[$j]}"
 maxrange="${maxrange_arr[$j]}"
+pqratio="${pqratio_arr[$j]}"
 
 expdir=$(mktemp -d /tmp/surf_exp.XXXXXXX)
 experiment "SuRF"
 
-done
-done
 done
 done
 done

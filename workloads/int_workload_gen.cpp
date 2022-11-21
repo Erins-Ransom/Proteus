@@ -17,9 +17,8 @@
 using namespace std;
 
 const double readWriteProportion = 0.5;
-
-// Start from index 1 because the first uint64_t is the number of keys in the file
-static size_t SOSD_IDX = 1;
+static size_t SOSD_IDX = 0;
+std::vector<uint64_t> SOSD_DATA;
 
 enum kdist_type {
     kuniform, knormal, ksosd_books, ksosd_fb
@@ -34,7 +33,6 @@ static std::vector<std::string> qdist_names = {"quniform", "qnormal", "qcorrelat
 
 static std::unordered_map<std::string, kdist_type> str_to_kdist = {{"kuniform", kuniform}, {"knormal", knormal}, {"ksosd_books", ksosd_books}, {"ksosd_fb", ksosd_fb}};
 static std::unordered_map<kdist_type, std::string> ksosd_to_file_name = {{ksosd_books, "books_800M_uint64"}, {ksosd_fb, "fb_200M_uint64"}};
-static std::unordered_map<qdist_type, std::string> qsosd_to_file_name = {{qsosd_books, "books_800M_uint64"}, {qsosd_fb, "fb_200M_uint64"}};
 static std::unordered_map<std::string, qdist_type> str_to_qdist = {{"quniform", quniform}, {"qnormal", qnormal}, {"qcorrelated", qcorrelated}, {"qsplit", qsplit}, {"qsosd_books", qsosd_books}, {"qsosd_fb", qsosd_fb}};
 
 
@@ -73,32 +71,16 @@ std::vector<uint64_t> generateKeysNormal(unsigned long long nkeys, unsigned long
     return keys;
 }
 
-std::vector<uint64_t> getSOSDKeys(unsigned long long nkeys, const std::string filename) {
-    assert(std::experimental::filesystem::exists(filename));
-    std::ifstream in(filename, std::ios::binary);
-    if (!in.is_open()) {
-        std::cerr << "unable to open " << filename << std::endl;
-        exit(EXIT_FAILURE);
-    }
-
-    std::vector<uint64_t> keys;
-    keys.resize(nkeys);
-
-    // Read number of values according to supplied argument.
-    in.seekg(SOSD_IDX * sizeof(uint64_t), in.beg);
-    in.read(reinterpret_cast<char*>(keys.data()), nkeys * sizeof(uint64_t));
-    in.close();
-
-    // Update global file index
+std::vector<uint64_t> getSOSDKeys(unsigned long long nkeys) {
+    std::vector<uint64_t> keys(SOSD_DATA.begin() + SOSD_IDX, SOSD_DATA.begin() + SOSD_IDX + nkeys);
     SOSD_IDX += nkeys;
-
     return keys;
 }
 
 std::vector<std::pair<uint64_t, uint64_t>> generateRangeQueries(unsigned long long nqueries, unsigned long long min_range, unsigned long long max_range, 
                                                                 double pqratio, const std::vector<uint64_t>& keys, 
                                                                 qdist_type qdist, unsigned long long correlation_degree, 
-                                                                double pnratio, const std::string sosd_dir) {
+                                                                double pnratio) {
 
     std::vector<std::pair<uint64_t, uint64_t>> txn_keys;
     std::vector<uint64_t> range_lefts;
@@ -113,10 +95,10 @@ std::vector<std::pair<uint64_t, uint64_t>> generateRangeQueries(unsigned long lo
         long double standard_deviation = std::pow(2.0L, 64.0L) * 0.1L;
         range_lefts = generateKeysNormal(nqueries, std::numeric_limits<uint64_t>::max() - max_range, standard_deviation);
     } else if (qdist == qsosd_books || qdist == qsosd_fb) {
-        range_lefts = getSOSDKeys(nqueries, sosd_dir + qsosd_to_file_name[qdist]);
+        range_lefts = getSOSDKeys(nqueries);
     } else if (qdist == qsplit) {
         range_lefts1 = keys;
-        range_lefts2 = generateKeysUniform(nqueries, std::numeric_limits<uint64_t>::max() - 16384); // change this!
+        range_lefts2 = generateKeysUniform(nqueries / 2, std::numeric_limits<uint64_t>::max() - max_range);
     }
 
     uint64_t range_size, left;
@@ -132,117 +114,95 @@ std::vector<std::pair<uint64_t, uint64_t>> generateRangeQueries(unsigned long lo
         std::mt19937 gen2(rd2());
         uniform_int_distribution<uint64_t> uni_dist2(0, range_lefts2.size() - 1);
 
-        // Change Query Composition Here
-        uint64_t nqueries1 = nqueries / 2;  // Clustered, Short-Range by default
-        uint64_t nqueries2 = nqueries / 2;  // Uniform, Long-Range by default
+        double pqratio_corr = pqratio <= 0.5 ? pqratio * 2.0 : 1.0;
+        double pqratio_unif = pqratio <= 0.5 ? 0.0 : (pqratio - 0.5) * 2.0;
 
-        // All Point Query -> Change PQ Ratio to be 1.0 in bench.sh
-        // All Short Range -> Change all the min and max range sizes below to be 2 32, PQ Ratio 0.0 in bench.sh
-        // All Long Range -> Change all the min and max range sizes below to be 2 4096, PQ Ratio 0.0 in bench.sh
-        // Clustered PQ + Medium Range Uniform -> Change PQ Ratio to be 1.0 in bench.sh, set min_range_size2 to 2 and max_range_size2 to 1024, comment / uncomment appropriate PQ ratio code below for nqueries2
-        
-        // Remember to re-compile workload_gen!
+        // Correlated Queries
+        std::random_device rd_corr;
+        std::mt19937 gen_corr(rd_corr());
+        uniform_int_distribution<uint64_t> corr_dist(1, correlation_degree);
 
-        uint64_t min_range_size1 = 2;
-        uint64_t max_range_size1 = 32;
-        uint64_t max_correlation_degree1 = 1024;
-
-        std::random_device rd_corr1;
-        std::mt19937 gen_corr1(rd_corr1());
-        uniform_int_distribution<uint64_t> uni_dist_corr1(1, max_correlation_degree1);
-        
-        uint64_t min_range_size2 = 2048;
-        uint64_t max_range_size2 = 4096;
-
-        for (uint64_t i = 0; i < nqueries1; i++) {
-            double random_from_zero_to_one = uni_dist1(gen1) * 1.0 / (range_lefts1.size() - 1);
-            if (random_from_zero_to_one < pnratio) {
-                left = keys[uni_dist1(gen1)] - 1;
-            } else {
-                left = range_lefts1[uni_dist1(gen1)] + uni_dist_corr1(gen_corr1);
-            }
-
-            // Generate query range
-            random_from_zero_to_one = uni_dist1(gen1) * 1.0 / (range_lefts1.size() - 1);
-            if (random_from_zero_to_one < pqratio) {
+        for (uint64_t i = 0; i < nqueries / 2; i++) {
+            // Generate range query size
+            double randdbl = uni_dist1(gen1) * 1.0 / (range_lefts1.size() - 1);
+            if (randdbl < pqratio_corr) {
                 range_size = 1;
-            } else {   
-                range_size = (rand() % (max_range_size1 - min_range_size1)) + min_range_size1;
-                if (range_size < 2) range_size = 2; // minimum range size is 2
+            } else if (min_range == max_range) {
+                range_size = 2;
+            } else {
+                range_size = (rand() % (max_range - min_range)) + std::max(2ULL, min_range);
             }
+
+            // Generate left query bound
+            randdbl = uni_dist1(gen1) * 1.0 / (range_lefts1.size() - 1);
+            if (randdbl < pnratio) {
+                left = range_size > 1 ? keys[uni_dist1(gen1)] - 1 : keys[uni_dist1(gen1)];
+            } else {
+                left = range_lefts1[uni_dist1(gen1)] + corr_dist(gen_corr);
+            }
+            
             if (std::numeric_limits<uint64_t>::max() - left > range_size) {
                 txn_keys.push_back(std::pair<uint64_t, uint64_t>(left, left + range_size));
             }
         }
 
-        for (uint64_t i = 0; i < nqueries2; i++) {
-            double random_from_zero_to_one = uni_dist2(gen2) * 1.0 / (range_lefts2.size() - 1);
-            if (random_from_zero_to_one < pnratio) {
-                left = keys[uni_dist2(gen2)] - 1;
+        // Uniform Queries
+        for (uint64_t i = 0; i < nqueries / 2; i++) {
+            // Generate range query size
+            double randdbl = uni_dist2(gen2) * 1.0 / (range_lefts2.size() - 1);
+            if (randdbl < pqratio_unif) {
+                range_size = 1;
+            } else if (min_range == max_range) {
+                range_size = 2;
+            } else {
+                range_size = (rand() % (max_range - min_range)) + std::max(2ULL, min_range);
+            }
+
+            // Generate left query bound
+            randdbl = uni_dist2(gen2) * 1.0 / (range_lefts2.size() - 1);
+            if (randdbl < pnratio) {
+                left = range_size > 1 ? keys[uni_dist2(gen2)] - 1 : keys[uni_dist2(gen2)];
             } else {
                 left = range_lefts2[uni_dist2(gen2)];
             }
 
-            // Generate query range
-            random_from_zero_to_one = uni_dist2(gen2) * 1.0 / (range_lefts2.size() - 1);
-
-            /*********************************************************
-                All Point Query / All Short Range / All Long Range
-            *********************************************************/
-
-            if (random_from_zero_to_one < pqratio) {
-                range_size = 1;
-            } else {   
-                range_size = (rand() % (max_range_size2 - min_range_size2)) + min_range_size2;
-                if (range_size < 2) range_size = 2; // minimum range size is 2
-            }
-            
-            /*******************************************
-                Clustered PQ + Medium Range Uniform
-            *******************************************/
-
-            // range_size = (rand() % (max_range_size2 - min_range_size2)) + min_range_size2;
-            // if (range_size < 2) range_size = 2; // minimum range size is 2
-
             if (std::numeric_limits<uint64_t>::max() - left > range_size){
                 txn_keys.push_back(std::pair<uint64_t, uint64_t>(left, left + range_size));
-            }
-            
+            }   
         }
     } else {
         std::random_device rd;
         std::mt19937 gen(rd());
-        uniform_int_distribution<uint64_t> uni_dist(0, index);
+        uniform_int_distribution<uint64_t> index_dist(0, index);
 
         std::random_device rd_corr;
         std::mt19937 gen_corr(rd_corr());
-        uniform_int_distribution<uint64_t> uni_dist_corr(1, correlation_degree);
+        uniform_int_distribution<uint64_t> corr_dist(1, correlation_degree);
 
         for (uint64_t i = 1; i <= nqueries; i++) {
-            double random_from_zero_to_one1 = uni_dist(gen) * 1.0 / index;
-            if (random_from_zero_to_one1 < pnratio) {
-                left = keys[uni_dist(gen)] - 1;
+            // Generate range query size
+            double randdbl = index_dist(gen) * 1.0 / index;
+            if (randdbl < pqratio) {
+                range_size = 1;
+            } else if (min_range == max_range) {
+                range_size = 2;
+            } else {
+                range_size = (rand() % (max_range - min_range)) + std::max(2ULL, min_range);
+            }
+
+            // Generate left query bound
+            randdbl = index_dist(gen) * 1.0 / index;
+            if (randdbl < pnratio) {
+                left = range_size > 1 ? keys[index_dist(gen)] - 1 : keys[index_dist(gen)];
             } else {
                 if (qdist == qcorrelated) {
-                    left = range_lefts[uni_dist(gen)] + uni_dist_corr(gen_corr);
+                    left = range_lefts[index_dist(gen)] + corr_dist(gen_corr);
                 } else {
-                    left = range_lefts[uni_dist(gen)];
-                }      
+                    left = range_lefts[index_dist(gen)];
+                } 
             }
 
-            double random_from_zero_to_one2 = uni_dist(gen) * 1.0 / index;
-            if (random_from_zero_to_one2 < pqratio) {
-                range_size = 1;
-            } else {   
-                if (min_range < 2) min_range = 2; // minimum range size is 2
-                if (min_range == max_range) {
-                    range_size = min_range;
-                } else {
-                    range_size = (rand() % (max_range - min_range)) + min_range;
-                }
-            }
-
-            if (std::numeric_limits<uint64_t>::max() - left > range_size) {
+            if (std::numeric_limits<uint64_t>::max() - left > range_size){
                 txn_keys.push_back(std::pair<uint64_t, uint64_t>(left, left + range_size));
             }
         }
@@ -256,14 +216,14 @@ std::vector<std::pair<uint64_t, uint64_t>> generateRangeQueries(unsigned long lo
     return txn_keys;
 }
 
-std::vector<uint64_t> generateKeys(unsigned long long nkeys, kdist_type kdist, const std::string sosd_dir) {
+std::vector<uint64_t> generateKeys(unsigned long long nkeys, kdist_type kdist) {
         
     if (kdist == kuniform) {
         return generateKeysUniform(nkeys, std::numeric_limits<uint64_t>::max());
     } else if (kdist == knormal) {
         return generateKeysNormal(nkeys, std::numeric_limits<uint64_t>::max(), std::numeric_limits<uint64_t>::max() * 0.01L);
     } else if (kdist == ksosd_books || kdist == ksosd_fb) {
-        return getSOSDKeys(nkeys, sosd_dir + ksosd_to_file_name[kdist]);
+        return getSOSDKeys(nkeys);
     } else {
         assert(false);
     }
@@ -436,6 +396,31 @@ int main(int argc, char *argv[]) {
                 kdist_names[kdist[i]].c_str(), qdist_names[qdist[i]].c_str(), pqratio[i], pnratio[i], correlation_degree[i]);
     }
 
+    // Shuffle SOSD dataset before using them
+    auto it = std::find_if(kdist.begin(), kdist.end(), [](kdist_type kd) { return kd == ksosd_books || kd == ksosd_fb; });
+    if (it != kdist.end()) {
+        std::string filename = SOSD_DATA_DIR + ksosd_to_file_name[*it];
+        assert(std::experimental::filesystem::exists(filename));
+        std::fstream f;
+        f.open(filename.c_str(), std::ios::out | std::ios::in | std::ios::binary);
+        if (!f.is_open()) {
+            std::cerr << "Unable to open " << filename << std::endl;
+            exit(EXIT_FAILURE);
+        }
+
+        // Read size
+        uint64_t size;
+        f.read(reinterpret_cast<char*>(&size), sizeof(uint64_t));
+        SOSD_DATA.resize(size);
+
+        // Read values
+        f.read(reinterpret_cast<char*>(SOSD_DATA.data()), size * sizeof(uint64_t));
+
+        // Shuffle data
+        std::default_random_engine rng(rand());
+        std::shuffle(std::begin(SOSD_DATA), std::end(SOSD_DATA), rng);
+    }
+
     // Create data directory
     std::string DIR = "my_data";
     mkdir(DIR.c_str(), 0777);
@@ -443,23 +428,23 @@ int main(int argc, char *argv[]) {
     std::vector<uint64_t> keys;
     keys.reserve(std::accumulate(nkeys.begin(), nkeys.end(), 0ULL));
 
-    std::vector<uint64_t> prev_keys = generateKeys(nkeys[0], kdist[0], SOSD_DATA_DIR);
+    std::vector<uint64_t> prev_keys = generateKeys(nkeys[0], kdist[0]);
     shuffleVector(prev_keys);
     keys.insert(keys.end(), prev_keys.begin(), prev_keys.end());
 
     std::vector<std::pair<uint64_t, uint64_t>> prev_queries = generateRangeQueries(
         nqueries[0], min_range[0], max_range[0], pqratio[0], keys,
-        qdist[0], correlation_degree[0], pnratio[0], SOSD_DATA_DIR);
+        qdist[0], correlation_degree[0], pnratio[0]);
     shuffleVector(prev_queries);
 
     for (size_t i = 1; i < nkeys.size(); i++) {
-        std::vector<uint64_t> gen_keys = generateKeys(nkeys[i], kdist[i], SOSD_DATA_DIR);
+        std::vector<uint64_t> gen_keys = generateKeys(nkeys[i], kdist[i]);
         shuffleVector(gen_keys);
         keys.insert(keys.end(), gen_keys.begin(), gen_keys.end());
 
         std::vector<std::pair<uint64_t, uint64_t>> gen_queries = generateRangeQueries(
             nqueries[i], min_range[i], max_range[i], pqratio[i], keys,
-            qdist[i], correlation_degree[i], pnratio[i], SOSD_DATA_DIR);
+            qdist[i], correlation_degree[i], pnratio[i]);
         shuffleVector(gen_queries);
         
         // Interleave successive workloads starting from the 2nd one
