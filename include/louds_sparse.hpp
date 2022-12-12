@@ -105,7 +105,7 @@ public:
     uint64_t getMemoryUsage() const;
 
     void serialize(char*& dst) const {
-		// Trie depth is already serialized in HyPR parent class
+		// Trie depth is already serialized in Proteus parent class
 		memcpy(dst, &height_, sizeof(height_));
 		dst += sizeof(height_);
 		memcpy(dst, &start_level_, sizeof(start_level_));

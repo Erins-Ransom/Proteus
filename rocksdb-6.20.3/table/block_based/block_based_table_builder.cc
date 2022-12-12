@@ -1446,6 +1446,10 @@ void BlockBasedTableBuilder::WriteFilterBlock(
       Slice filter_content =
           rep_->filter_builder->Finish(filter_block_handle, &s);
       assert(s.ok() || s.IsIncomplete());
+
+      // ProteusMod
+      RecordInHistogram(rep_->ioptions.statistics, RANGE_FILTER_BPK_TIMES_100, 8*100*filter_content.size()/rep_->props.num_entries);
+
       rep_->props.filter_size += filter_content.size();
       WriteRawBlock(filter_content, kNoCompression, &filter_block_handle);
     }

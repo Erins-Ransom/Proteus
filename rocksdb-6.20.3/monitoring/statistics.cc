@@ -88,6 +88,11 @@ const std::vector<std::pair<Tickers, std::string>> TickersNameMap = {
     {NUMBER_MERGE_FAILURES, "rocksdb.number.merge.failures"},
     {BLOOM_FILTER_PREFIX_CHECKED, "rocksdb.bloom.filter.prefix.checked"},
     {BLOOM_FILTER_PREFIX_USEFUL, "rocksdb.bloom.filter.prefix.useful"},
+    // ProteusMod
+    {RANGE_FILTER_HIT, "rocksdb.range.filter.hit"},
+    {RANGE_FILTER_MISS, "rocksdb.range.filter.miss"},
+    {RANGE_FILTER_USE, "rocksdb.range.filter.use"},
+    // end ProteusMod
     {NUMBER_OF_RESEEKS_IN_ITERATION, "rocksdb.number.reseeks.iteration"},
     {GET_UPDATES_SINCE_CALLS, "rocksdb.getupdatessince.calls"},
     {BLOCK_CACHE_COMPRESSED_MISS, "rocksdb.block.cachecompressed.miss"},
@@ -252,6 +257,9 @@ const std::vector<std::pair<Histograms, std::string>> HistogramsNameMap = {
     {BLOB_DB_DECOMPRESSION_MICROS, "rocksdb.blobdb.decompression.micros"},
     {FLUSH_TIME, "rocksdb.db.flush.micros"},
     {SST_BATCH_SIZE, "rocksdb.sst.batch.size"},
+    // ProteusMod
+    {RANGE_FILTER_BPK_TIMES_100, "rocksdb.range_filter.bpk_times_100"},
+    // end ProteusMod
     {NUM_INDEX_AND_FILTER_BLOCKS_READ_PER_LEVEL,
      "rocksdb.num.index.and.filter.blocks.read.per.level"},
     {NUM_DATA_BLOCKS_READ_PER_LEVEL, "rocksdb.num.data.blocks.read.per.level"},

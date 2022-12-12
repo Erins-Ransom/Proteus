@@ -15,10 +15,10 @@
 #include "config.hpp"
 
 // Print execution times of modeling code snippets
-#define MODEL_TIMING
+// #define MODEL_TIMING
 
 // Print the results of the modeling
-#define MODEL_PRINT
+// #define MODEL_PRINT
 
 // Print expected FPRs for all configurations
 // #define PRINT_EFPRS
@@ -155,9 +155,9 @@ size_t calcMemDist(std::vector<long double>& bf_mem,
                    double bits_per_key) {
     
     // In Bits
-    size_t DENSE_NODE_SIZE = 256 * 2;   // No D-IsPrefixKey
-    size_t SPARSE_NODE_SIZE = 8 + 2;
-    size_t TRIE_DEPTHS = bf_mem.size();
+    uint32_t DENSE_NODE_SIZE = 256 * 2;   // No D-IsPrefixKey
+    uint32_t SPARSE_NODE_SIZE = 8 + 2;
+    uint32_t TRIE_DEPTHS = bf_mem.size();
 
     // Stores the size of each trie byte level if it is encoded as LOUDS-Dense
     // Note that the size of a LOUDS-Dense node is independent of the number of children (i.e. it is constant)

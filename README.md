@@ -20,9 +20,9 @@ Note: This code has been updated with several modeling optimizations since the r
 
 `bench/` - contains all the files used for in-memory standalone filter benchmarks.
 
-`workloads/` - contains all the files used for generating synthetic workloads and downloading rreal-world datasets.
+`workloads/` - contains all the files used for generating synthetic workloads and downloading real-world datasets.
 
-`rocksdb/` - contains a modified version of RockDB with Proteus and SuRF integrated (To be Released).
+`rocksdb-6.20.3/` - contains a modified version of RockDB v6.20.3 with Proteus and SuRF integrated.
 
 `SuRF/` - git submodule containing the SuRF repository. 
 
@@ -56,3 +56,18 @@ Configure the workload setup as detailed in `bench.sh`.
 	cd Proteus/bench
 	make bench
 	./bench.sh &> bench.txt
+
+
+# RocksDB Filter Integration and Benchmarks
+
+Changes to the RocksDB source code can be grepping the tag `ProteusMod`. Since RockDB ["does not report false positive rate for prefix in seeks"](https://github.com/facebook/rocksdb/issues/3680#issuecomment-384786975), we implement custom range query FPR statistics recording. Note that this is only valid for experiments that use forward iterators only, not for general purpose. We use RocksDB v6.20.3 for our benchmarks.
+
+## Build RocksDB
+```
+cd rocksdb
+mkdir build && cd build
+cmake -DCMAKE_BUILD_TYPE=Release -DWITH_LZ4=ON -DWITH_ZSTD=ON ..
+make -j$(nproc) filter_experiment
+```
+
+There may be some compilation errors for `hash.hpp` in SuRF code regarding implicit fall through. These can be easily rectified by adding `// fall through` to the relevant switch statements.

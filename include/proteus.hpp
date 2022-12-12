@@ -361,6 +361,7 @@ bool Proteus::Iter::isValid(bool valid_dense, bool valid_sparse) const {
         return sparse_iter_.isValid();
     } else {
         assert(false);
+        return false;
     }
 }
 
@@ -378,6 +379,7 @@ int Proteus::Iter::compare(const T& key, bool valid_dense, bool valid_sparse, Pr
         return sparse_iter_.compare(key, prefix_filter, std::string());
     } else {
         assert(false);
+        return 0;
     }
 }
 

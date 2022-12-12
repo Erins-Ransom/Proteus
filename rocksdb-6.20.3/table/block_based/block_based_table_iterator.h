@@ -228,6 +228,18 @@ class BlockBasedTableIterator : public InternalIteratorBase<Slice> {
   // we need to check and update data_block_within_upper_bound_ accordingly.
   void CheckDataBlockWithinUpperBound();
 
+  // ProteusMod
+  bool CheckRangeMayExist(const Slice& ikey) {
+    assert(need_upper_bound_check_);
+    if (!(((BlockBasedTable*)table_)->RangeMayExist(ikey, 
+                                                    read_options_.iterate_upper_bound, 
+                                                    &lookup_context_))) {
+      ResetDataIter();
+      return false;
+    }
+    return true;
+  }
+
   bool CheckPrefixMayMatch(const Slice& ikey, IterDirection direction) {
     if (need_upper_bound_check_ && direction == IterDirection::kBackward) {
       // Upper bound check isn't sufficient for backward direction to

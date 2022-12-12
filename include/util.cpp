@@ -20,10 +20,37 @@ uint64_t sliceToUint64(const char* data) {
     return __builtin_bswap64(out);
 }
 
-
 std::string util_uint64ToString(const uint64_t& word) {
     uint64_t endian_swapped_word = __builtin_bswap64(word);
     return std::string(reinterpret_cast<const char*>(&endian_swapped_word), 8);
+}
+
+uint64_t util_stringToUint64(const std::string& str_word) {
+    uint64_t int_word = 0;
+    memcpy(reinterpret_cast<char*>(&int_word), str_word.data(), 8);
+    return __builtin_bswap64(int_word);
+}
+
+template <>
+void FIFOSampleQueryCache<std::string>::add(const std::pair<std::string, std::string> q) {
+    // Add every {sample_freq}-th query
+    std::lock_guard<std::mutex> guard(mut_);
+    counter_ = (counter_ == (sample_freq_ - 1)) ? 0 : (counter_ + 1);
+    if (counter_ == 0) {
+        sample_queries_[pos_] = q;
+        pos_ = (pos_ == (sample_queries_.size() - 1)) ? 0 : (pos_ + 1);
+    }
+}
+
+template <>
+void FIFOSampleQueryCache<uint64_t>::add(const std::pair<std::string, std::string> q) {
+    // Add every {sample_freq}-th query
+    std::lock_guard<std::mutex> guard(mut_);
+    counter_ = (counter_ == (sample_freq_ - 1)) ? 0 : (counter_ + 1);
+    if (counter_ == 0) {
+        sample_queries_[pos_] = std::make_pair(util_stringToUint64(q.first), util_stringToUint64(q.second));
+        pos_ = (pos_ == (sample_queries_.size() - 1)) ? 0 : (pos_ + 1);
+    }
 }
 
 void intLoadKeys(std::string keyFilePath,

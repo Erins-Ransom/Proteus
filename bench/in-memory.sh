@@ -157,8 +157,6 @@ STR_WORKL_BIN="$REPO_DIR/../workloads/str_workload_gen"
 EXP_BIN="$REPO_DIR/bench"
 
 experiment() {
-    filter=$1 && shift
-
     cd "$expdir"
     touch ./experiment_result
     if [[ "${IS_INT_BENCH}" == "1" ]]; then
@@ -213,6 +211,7 @@ experiment() {
 }
 
 # Proteus Experiments
+filter="Proteus"
 for nkeys in "${nkeys_arr[@]}"; do
 for keylen in "${keylen_arr[@]}"; do   
 for nqrys in "${nqrys_arr[@]}"; do
@@ -230,7 +229,7 @@ maxrange="${maxrange_arr[$j]}"
 pqratio="${pqratio_arr[$j]}"
 
 expdir=$(mktemp -d /tmp/proteus_exp.XXXXXXX)
-experiment "Proteus"
+experiment
 
 done
 done
@@ -244,6 +243,7 @@ done
 
 
 # SuRF experiments
+filter="SuRF"
 for nkeys in "${nkeys_arr[@]}"; do
 for keylen in "${keylen_arr[@]}"; do
 for nqrys in "${nqrys_arr[@]}"; do
@@ -261,7 +261,7 @@ maxrange="${maxrange_arr[$j]}"
 pqratio="${pqratio_arr[$j]}"
 
 expdir=$(mktemp -d /tmp/surf_exp.XXXXXXX)
-experiment "SuRF"
+experiment
 
 done
 done

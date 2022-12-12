@@ -2035,6 +2035,23 @@ BlockBasedTable::PartitionedIndexIteratorState::NewSecondaryIterator(
   return new IndexBlockIter();
 }
 
+// ProteusMod
+bool BlockBasedTable::RangeMayExist(const Slice& internal_key, const Slice* upper_key,
+                                    BlockCacheLookupContext* lookup_context) {
+    FilterBlockReader* const filter = rep_->filter.get();
+    assert(filter != nullptr);
+    bool filter_checked = false;
+    auto user_key = ExtractUserKey(internal_key);
+    const Slice* const const_ikey_ptr = &internal_key;
+
+    // Calls FullFilterBlockReader::RangeMayExist
+    bool out = filter->RangeMayExist(upper_key, user_key, nullptr, nullptr, const_ikey_ptr, 
+                                     &filter_checked, true, false, lookup_context);
+
+    assert(filter_checked);
+    return out;
+}
+
 // This will be broken if the user specifies an unusual implementation
 // of Options.comparator, or if the user specifies an unusual
 // definition of prefixes in BlockBasedTableOptions.filter_policy.

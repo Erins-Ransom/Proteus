@@ -305,6 +305,31 @@ bool FullFilterBlockReader::RangeMayExist(
     const Slice* const const_ikey_ptr, bool* filter_checked,
     bool need_upper_bound_check, bool no_io,
     BlockCacheLookupContext* lookup_context) {
+
+  // ProteusMod
+  if (strcmp(table()->get_rep()->filter_policy->Name(), "Proteus") 
+      || strcmp(table()->get_rep()->filter_policy->Name(), "SuRF")) {
+
+    CachableEntry<ParsedFullFilterBlock> filter_block;
+    const Status s = GetOrReadFilterBlock(/* no_io */ false, /* get_context */ nullptr,
+                                          lookup_context, &filter_block);
+    if (!s.ok()) {
+        IGNORE_STATUS_IF_ERROR(s);
+        return true;
+    }
+    assert(filter_block.GetValue());
+
+    FilterBitsReader* const filter_bits_reader =
+      filter_block.GetValue()->filter_bits_reader();
+    
+    if (filter_bits_reader) {
+      *filter_checked = true;
+      return filter_bits_reader->RangeQuery(user_key_without_ts, *iterate_upper_bound);
+    }
+
+    return true;
+  }
+
   if (!prefix_extractor || !prefix_extractor->InDomain(user_key_without_ts)) {
     *filter_checked = false;
     return true;

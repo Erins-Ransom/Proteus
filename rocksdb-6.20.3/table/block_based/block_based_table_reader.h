@@ -107,6 +107,9 @@ class BlockBasedTable : public TableReader {
                       const bool need_upper_bound_check,
                       BlockCacheLookupContext* lookup_context) const;
 
+  // ProteusMod
+  bool RangeMayExist(const Slice& internal_key, const Slice* upper_key, BlockCacheLookupContext* lookup_context);
+
   // Returns a new iterator over the table contents.
   // The result of NewIterator() is initially invalid (caller must
   // call one of the Seek methods on the iterator before using it).

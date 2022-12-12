@@ -569,6 +569,11 @@ endif()
 
 include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${PROJECT_SOURCE_DIR}/include)
+
+# ProteusMod
+include_directories(${PROJECT_SOURCE_DIR}/../include)
+include_directories(${PROJECT_SOURCE_DIR}/../SuRF/include)
+
 if(WITH_FOLLY_DISTRIBUTED_MUTEX)
   include_directories(${PROJECT_SOURCE_DIR}/third-party/folly)
 endif()
@@ -790,6 +795,18 @@ set(SOURCES
         util/thread_local.cc
         util/threadpool_imp.cc
         util/xxhash.cc
+        # ProteusMod
+        util/filter_proteus.cc
+        util/filter_surf.cc
+        ../SuRF/include/surf.hpp
+        ../include/proteus.hpp
+        ../include/modeling.cpp
+        ../include/util.cpp
+        ../include/clhash.cpp
+        ../include/config.cpp
+        ../include/prefixbf.cpp
+        ../include/MurmurHash3.cpp
+        # end ProteusMod
         utilities/backupable/backupable_db.cc
         utilities/blob_db/blob_compaction_filter.cc
         utilities/blob_db/blob_db.cc
@@ -1373,3 +1390,6 @@ option(WITH_EXAMPLES "build with examples" OFF)
 if(WITH_EXAMPLES)
   add_subdirectory(examples)
 endif()
+
+# ProteusMod
+add_subdirectory(filter_experiment)

@@ -30,6 +30,9 @@
 #include "rocksdb/advanced_options.h"
 #include "rocksdb/status.h"
 
+// ProteusMod
+#include "../include/util.hpp"
+
 namespace ROCKSDB_NAMESPACE {
 
 class Slice;
@@ -86,6 +89,15 @@ class FilterBitsReader {
     for (int i = 0; i < num_keys; ++i) {
       may_match[i] = MayMatch(*keys[i]);
     }
+  }
+
+  // ProteusMod
+  // Virtual function to avoid casting to specific filter
+  // Used in table/block_based/full_filter_block.cc RangeMayExist
+  virtual bool RangeQuery(const Slice& left, const Slice& right){
+    (void) left;
+    (void) right;
+    return true;
   }
 };
 
@@ -236,5 +248,15 @@ extern const FilterPolicy* NewBloomFilterPolicy(
 // be exceptional and log an appropriate warning.
 extern const FilterPolicy* NewExperimentalRibbonFilterPolicy(
     double bloom_equivalent_bits_per_key);
+
+// ProteusMod
+extern const FilterPolicy* NewProteusFilterPolicy(proteus::FIFOSampleQueryCache<uint64_t>* sqc,
+                                                  double bpk);
+
+extern const FilterPolicy* NewProteusFilterPolicy(proteus::FIFOSampleQueryCache<std::string>* sqc,
+                                                  double bpk);
+
+extern const FilterPolicy* NewSuRFFilterPolicy(uint32_t hash_len,
+                                               uint32_t real_len);
 
 }  // namespace ROCKSDB_NAMESPACE

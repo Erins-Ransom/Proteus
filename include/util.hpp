@@ -6,6 +6,7 @@
 #include <set>
 #include <vector>
 #include <mutex>
+#include <random>
 
 namespace proteus {
 
@@ -19,25 +20,17 @@ class FIFOSampleQueryCache {
         size_t counter_;
 
     public:
-        explicit FIFOSampleQueryCache(std::vector<std::pair<T, T>> initial_sample, size_t sample_freq) :
-                                      pos_(0), sample_freq_(sample_freq), counter_(0) {
+        explicit FIFOSampleQueryCache(std::vector<std::pair<T, T>> initial_sample, size_t sample_frequency) :
+                                      pos_(0), sample_freq_(sample_frequency), counter_(0) {
             sample_queries_ = initial_sample;
-        }
-        
-        void add(const std::pair<T, T> sq) {
-            // Add every {sample_freq}-th query
-            std::lock_guard<std::mutex> guard(mut_);
-            counter_ = (counter_ == (sample_freq - 1)) ? 0 : (counter_ + 1);
-            if (counter_ == 0) {
-                sample_queries_[pos_] = sq;
-                pos_ = (pos_ == (sample_queries_.size() - 1)) ? 0 : (pos_ + 1);
-            }
         }
 
         std::vector<std::pair<T, T>> getSampleQueries() {
             std::lock_guard<std::mutex> guard(mut_);
             return sample_queries_;
         }
+        
+        void add(const std::pair<std::string, std::string> q);
 };
 
 uint64_t sliceToUint64(const char* data);

@@ -179,6 +179,11 @@ enum Tickers : uint32_t {
   BLOOM_FILTER_PREFIX_CHECKED,
   BLOOM_FILTER_PREFIX_USEFUL,
 
+  // ProteusMod
+  RANGE_FILTER_HIT,
+  RANGE_FILTER_MISS,
+  RANGE_FILTER_USE,
+
   // Number of times we had to reseek inside an iteration to skip
   // over large number of keys with same userkey.
   NUMBER_OF_RESEEKS_IN_ITERATION,
@@ -472,6 +477,9 @@ enum Histograms : uint32_t {
   // Time spent flushing memtable to disk
   FLUSH_TIME,
   SST_BATCH_SIZE,
+
+  // ProteusMod
+  RANGE_FILTER_BPK_TIMES_100,
 
   // MultiGet stats logged per level
   // Num of index and filter blocks read from file system per level.

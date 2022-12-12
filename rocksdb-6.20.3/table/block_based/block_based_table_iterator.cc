@@ -16,6 +16,16 @@ void BlockBasedTableIterator::SeekToFirst() { SeekImpl(nullptr); }
 void BlockBasedTableIterator::SeekImpl(const Slice* target) {
   is_out_of_bound_ = false;
   is_at_first_key_from_index_ = false;
+
+  // ProteusMod
+  if (target) {
+      RecordTick(table_->get_rep()->ioptions.statistics, RANGE_FILTER_USE);
+      if (!CheckRangeMayExist(*target)) {
+          ResetDataIter();
+          return;
+      }
+  }
+
   if (target && !CheckPrefixMayMatch(*target, IterDirection::kForward)) {
     ResetDataIter();
     return;
@@ -52,6 +62,9 @@ void BlockBasedTableIterator::SeekImpl(const Slice* target) {
     }
 
     if (!index_iter_->Valid()) {
+      // ProteusMod
+      // Range does not intersect with keyset but filter said it does in CheckPrefixMayMatch above.
+      RecordTick(table_->get_rep()->ioptions.statistics, RANGE_FILTER_MISS);
       ResetDataIter();
       return;
     }
@@ -95,6 +108,13 @@ void BlockBasedTableIterator::SeekImpl(const Slice* target) {
   CheckOutOfBound();
 
   if (target) {
+    // ProteusMod
+    // Range does not intersect with keyset but filter said it does in CheckPrefixMayMatch above.
+    if (!Valid()) {
+      RecordTick(table_->get_rep()->ioptions.statistics, RANGE_FILTER_MISS);
+    } else {
+      RecordTick(table_->get_rep()->ioptions.statistics, RANGE_FILTER_HIT);
+    }
     assert(!Valid() || icomp_.Compare(*target, key()) <= 0);
   }
 }
