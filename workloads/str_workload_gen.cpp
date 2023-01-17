@@ -382,6 +382,11 @@ int main(int argc, char *argv[]) {
             return s1.size() < s2.size();
         });
         max_klen = (*max).size();
+
+        // Pad out domains to max key length
+        for (size_t i = 0; i < keys.size(); i++) {
+            keys[i].resize(max_klen, '\0');
+        }
     }
 
     std::vector<std::pair<std::string, std::string>> queries = generateRangeQueries(
