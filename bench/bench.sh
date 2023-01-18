@@ -128,12 +128,12 @@ fi
 # Must be a positive real number
 membudg_arr=(8 10 12 14 16 18 20)
 
-## Sample Rate
+## Sample Proportion
 #######################################
 # Determines the proportion of queries given to Proteus as a sample
 # Must be >= 0.0 && <= 1.0
 # Default sample size for in-memory benchmarks is 20K, see paper for sample size justification
-samplerate_arr=(0.02)
+sampleprop_arr=(0.02)
 
 
 ### SuRF
@@ -199,9 +199,9 @@ experiment() {
     
     elif [ $filter = "Proteus" ]; then
         echo -e "\tFilter Bits-per-Key:\t$membudg" >> ./experiment_result
-        echo -e "\tSample Rate:\t$samplerate" >> ./experiment_result
+        echo -e "\tSample Proportion:\t$sampleprop" >> ./experiment_result
         echo -e "### END EXPERIMENT DESCRIPTION ###\n\n" >> ./experiment_result
-        $EXP_BIN "$IS_INT_BENCH" "$filter" "$membudg" "$samplerate" >> ./experiment_result
+        $EXP_BIN "$IS_INT_BENCH" "$filter" "$membudg" "$sampleprop" >> ./experiment_result
     fi
 
     echo -e "### END EXPERIMENT ###" >> ./experiment_result
@@ -221,7 +221,7 @@ for j in "${!minrange_arr[@]}"; do
 for membudg in "${membudg_arr[@]}"; do
 for corrd in "${corrd_arr[@]}"; do
 for pnratio in "${pnratio_arr[@]}"; do
-for samplerate in "${samplerate_arr[@]}"; do
+for sampleprop in "${sampleprop_arr[@]}"; do
 
 kdist="${kdist_arr[$i]}"
 qdist="${qdist_arr[$i]}"

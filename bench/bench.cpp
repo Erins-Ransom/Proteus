@@ -13,7 +13,7 @@
 #include "../SuRF/include/surf.hpp"
 
 static size_t surf_hlen = 0, surf_rlen = 0;
-static double sample_rate = 0.0;
+static double sample_proportion = 0.0;
 static bool is_int_bench;
 static size_t keylen;
 static double bpk;
@@ -177,7 +177,7 @@ int main(int argc, char **argv) {
 
     if (use_Proteus) {
         bpk = strtod(argv[3], nullptr);
-        sample_rate = strtod(argv[4], nullptr);
+        sample_proportion = strtod(argv[4], nullptr);
     } else if (use_SuRF) {
         surf_hlen = strtoull(argv[3], nullptr, 10);
         surf_rlen = strtoull(argv[4], nullptr, 10);
@@ -202,7 +202,7 @@ int main(int argc, char **argv) {
         proteus::intLoadQueries(lQueryFilePath, uQueryFilePath, queries, squeries);
         
         if (use_Proteus) {
-            sample_queries = proteus::sampleQueries(queries, sample_rate);
+            sample_queries = proteus::sampleQueries(queries, sample_proportion);
         }
 
         runExperiment(keys, keyset, queries, sample_queries, skeys, squeries);
@@ -217,7 +217,7 @@ int main(int argc, char **argv) {
         proteus::strLoadQueries(lQueryFilePath, uQueryFilePath, queries);
         
         if (use_Proteus) {
-            sample_queries = proteus::sampleQueries(queries, sample_rate);
+            sample_queries = proteus::sampleQueries(queries, sample_proportion);
         }
 
         runExperiment(keys, keyset, queries, sample_queries, keys, queries);

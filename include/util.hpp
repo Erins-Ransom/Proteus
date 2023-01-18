@@ -15,19 +15,19 @@ class FIFOSampleQueryCache {
         std::vector<std::pair<T, T>> sample_queries_;
         std::mutex mut_;
         size_t pos_; // position in the array for the next insert
-        size_t sample_rate_;
+        size_t sample_freq_;
         size_t counter_;
 
     public:
-        explicit FIFOSampleQueryCache(std::vector<std::pair<T, T>> initial_sample, size_t sample_rate) :
-                                      pos_(0), sample_rate_(sample_rate), counter_(0) {
+        explicit FIFOSampleQueryCache(std::vector<std::pair<T, T>> initial_sample, size_t sample_freq) :
+                                      pos_(0), sample_freq_(sample_freq), counter_(0) {
             sample_queries_ = initial_sample;
         }
         
         void add(const std::pair<T, T> sq) {
-            // Add every {sample_rate_}-th query
+            // Add every {sample_freq}-th query
             std::lock_guard<std::mutex> guard(mut_);
-            counter_ = (counter_ == (sample_rate_ - 1)) ? 0 : (counter_ + 1);
+            counter_ = (counter_ == (sample_freq - 1)) ? 0 : (counter_ + 1);
             if (counter_ == 0) {
                 sample_queries_[pos_] = sq;
                 pos_ = (pos_ == (sample_queries_.size() - 1)) ? 0 : (pos_ + 1);
@@ -61,10 +61,10 @@ void strLoadQueries(std::string lQueryFilePath,
                     std::vector<std::pair<std::string, std::string>>& squeries);
 
 template<typename T>
-std::vector<std::pair<T, T>> sampleQueries(const std::vector<std::pair<T, T>>& queries, double sample_rate) {
+std::vector<std::pair<T, T>> sampleQueries(const std::vector<std::pair<T, T>>& queries, double sample_proportion) {
     std::vector<std::pair<T, T>> sample_queries;
     std::default_random_engine generator;
-    std::bernoulli_distribution distribution(sample_rate);
+    std::bernoulli_distribution distribution(sample_proportion);
     for (auto const & q : queries) {
         if (distribution(generator)) {
             sample_queries.push_back(q);
