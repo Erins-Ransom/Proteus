@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Reference: https://sharats.me/posts/shell-script-best-practices/)
+# Reference: https://sharats.me/posts/shell-script-best-practices/
 
 # Exit if a command fails  
 set -o errexit
@@ -195,13 +195,13 @@ experiment() {
         echo -e "\tSuRF Hash Suffix Length:\t$surfhlen" >> ./experiment_result
         echo -e "\tSuRF Real Suffix Length:\t$surfrlen" >> ./experiment_result
         echo -e "### END EXPERIMENT DESCRIPTION ###\n\n" >> ./experiment_result
-        $EXP_BIN "$IS_INT_BENCH" "$nkeys" "$keylen" "$nqrys" "10" "$filter" "$surfhlen" "$surfrlen" >> ./experiment_result
+        $EXP_BIN "$IS_INT_BENCH" "$filter" "$surfhlen" "$surfrlen" >> ./experiment_result
     
     elif [ $filter = "Proteus" ]; then
         echo -e "\tFilter Bits-per-Key:\t$membudg" >> ./experiment_result
         echo -e "\tSample Rate:\t$samplerate" >> ./experiment_result
         echo -e "### END EXPERIMENT DESCRIPTION ###\n\n" >> ./experiment_result
-        $EXP_BIN "$IS_INT_BENCH" "$nkeys" "$keylen" "$nqrys" "$membudg" "$filter" "$samplerate" >> ./experiment_result
+        $EXP_BIN "$IS_INT_BENCH" "$filter" "$membudg" "$samplerate" >> ./experiment_result
     fi
 
     echo -e "### END EXPERIMENT ###" >> ./experiment_result

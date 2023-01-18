@@ -74,15 +74,14 @@ void intLoadQueries(std::string lQueryFilePath,
 
 size_t strLoadKeys(std::string keyFilePath,
                    std::vector<std::string>& skeys,
-                   std::set<std::string>& keyset,
-                   const size_t nkeys) {
+                   std::set<std::string>& keyset) {
     
     std::ifstream keyFile(keyFilePath, std::ifstream::binary);
     uint32_t sz;
     keyFile.read(reinterpret_cast<char*>(&sz), sizeof(uint32_t));
 
     char* k_arr = new char[sz];
-    for (size_t i = 0; i < nkeys; i++) {
+    while (keyFile.peek() != EOF) {
         keyFile.read(k_arr, sz);
         keyset.insert(std::string(k_arr, sz));
         skeys.push_back(std::string(k_arr, sz)); 
@@ -98,8 +97,7 @@ size_t strLoadKeys(std::string keyFilePath,
 
 void strLoadQueries(std::string lQueryFilePath, 
                     std::string rQueryFilePath,
-                    std::vector<std::pair<std::string, std::string>>& squeries,
-                    const size_t nqueries) {
+                    std::vector<std::pair<std::string, std::string>>& squeries) {
     
     std::ifstream lQueryFile(lQueryFilePath, std::ifstream::binary);
     std::ifstream rQueryFile(rQueryFilePath, std::ifstream::binary);
@@ -113,7 +111,7 @@ void strLoadQueries(std::string lQueryFilePath,
     char* lq_arr = new char[lsz];
     char* rq_arr = new char[rsz];
 
-    for (size_t i = 0; i < nqueries; i++) {
+    while (lQueryFile.peek() != EOF && rQueryFile.peek() != EOF) {
         lQueryFile.read(lq_arr, lsz);
         rQueryFile.read(rq_arr, rsz);
         lq = std::string(lq_arr, lsz);

@@ -54,13 +54,11 @@ void intLoadQueries(std::string lQueryFilePath,
 
 size_t strLoadKeys(std::string keyFilePath,
                    std::vector<std::string>& skeys,
-                   std::set<std::string>& keyset,
-                   const size_t nkeys);
+                   std::set<std::string>& keyset);
 
 void strLoadQueries(std::string lQueryFilePath, 
                     std::string rQueryFilePath,
-                    std::vector<std::pair<std::string, std::string>>& squeries,
-                    const size_t nqueries);
+                    std::vector<std::pair<std::string, std::string>>& squeries);
 
 template<typename T>
 std::vector<std::pair<T, T>> sampleQueries(const std::vector<std::pair<T, T>>& queries, double sample_rate) {

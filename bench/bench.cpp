@@ -15,9 +15,7 @@
 static size_t surf_hlen = 0, surf_rlen = 0;
 static double sample_rate = 0.0;
 static bool is_int_bench;
-static size_t nkeys;
 static size_t keylen;
-static size_t nqueries;
 static double bpk;
 static bool use_Proteus;
 static bool use_SuRF;
@@ -171,22 +169,18 @@ void runExperiment(std::vector<T>& keys,
 
 
 int main(int argc, char **argv) {
-    assert(argc >= 8);
+    assert(argc == 5);
 
     is_int_bench = strtoull(argv[1], nullptr, 10) == 1;
-    nkeys = strtoull(argv[2], nullptr, 10);
-    keylen = strtoull(argv[3], nullptr, 10);
-    assert(keylen % 8 == 0);
-    nqueries = strtoull(argv[4], nullptr, 10);
-    bpk = strtod(argv[5], nullptr);
-    use_Proteus = (strcmp(argv[6], "Proteus") == 0);
-    use_SuRF = (strcmp(argv[6], "SuRF") == 0);
+    use_Proteus = (strcmp(argv[2], "Proteus") == 0);
+    use_SuRF = (strcmp(argv[2], "SuRF") == 0);
 
     if (use_Proteus) {
-        sample_rate = strtod(argv[7], nullptr);
+        bpk = strtod(argv[3], nullptr);
+        sample_rate = strtod(argv[4], nullptr);
     } else if (use_SuRF) {
-        surf_hlen = strtoull(argv[7], nullptr, 10);
-        surf_rlen = strtoull(argv[8], nullptr, 10);
+        surf_hlen = strtoull(argv[3], nullptr, 10);
+        surf_rlen = strtoull(argv[4], nullptr, 10);
     }
 
     std::string dataPath = "./my_data/";
@@ -195,6 +189,8 @@ int main(int argc, char **argv) {
     std::string uQueryFilePath = dataPath + "upper_bound0.txt";
 
     if (is_int_bench) {
+        keylen = 64;
+
         std::vector<uint64_t> keys;
         std::vector<std::string> skeys;
         std::set<uint64_t> keyset;
@@ -217,8 +213,8 @@ int main(int argc, char **argv) {
         std::vector<std::pair<std::string, std::string>> queries;
         std::vector<std::pair<std::string, std::string>> sample_queries;
 
-        keylen = proteus::strLoadKeys(keyFilePath, keys, keyset, nkeys) * 8;
-        proteus::strLoadQueries(lQueryFilePath, uQueryFilePath, queries, nqueries);
+        keylen = proteus::strLoadKeys(keyFilePath, keys, keyset) * 8;
+        proteus::strLoadQueries(lQueryFilePath, uQueryFilePath, queries);
         
         if (use_Proteus) {
             sample_queries = proteus::sampleQueries(queries, sample_rate);
