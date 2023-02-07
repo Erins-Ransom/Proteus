@@ -18,13 +18,13 @@ Note: This code has been updated with several modeling optimizations since the r
 ## Directory Layout
 `include/` - contains all the files necessary to the implementation of the Proteus filter and the CPFPR model.
 
-`bench/` - contains all the files used for in-memory standalone filter benchmarks.
+`bench/` - contains all the files used for in-memory standalone filter benchmarks and a script to run RocksDB benchmarks.
 
 `workloads/` - contains all the files used for generating synthetic workloads and downloading real-world datasets.
 
 `rocksdb-6.20.3/` - contains a modified version of RockDB v6.20.3 with Proteus and SuRF integrated.
 
-`SuRF/` - git submodule containing the SuRF repository. 
+`SuRF/` - modified version of SuRF. 
 
 ## Requirements
 
@@ -38,15 +38,11 @@ sudo apt-get install jq build-essential cmake libgtest.dev liblz4-dev libzstd-de
 
 ## Setup
 
-Note: use either the `--recursive` parameter when cloning the repositiory or use the `submodule update` command in order to clone the SuRF submodule.  
-
-
-	git clone --recursive https://github.com/Eric-R-Knorr/Proteus.git
 	cd Proteus/workloads
 	./setup.sh
 
 	
-`setup.sh` - compiles string and integer workload generators and retrieves real-world datasets - `books_800M_uint64` and `fb_200M_uint64` from https://github.com/learnedsystems/SOSD, `.org` domains from https://domainsproject.org/
+`setup.sh` compiles string and integer workload generators and retrieves real-world datasets - `books_800M_uint64` and `fb_200M_uint64` from https://github.com/learnedsystems/SOSD, `.org` domains from https://domainsproject.org/
 
 
 # Standalone In-Memory Filter Benchmarks
@@ -57,17 +53,21 @@ Configure the workload setup as detailed in `bench.sh`.
 	make bench
 	./bench.sh &> bench.txt
 
+To see more modeling information, uncomment the relevant macro definitions in `include/modeling.cpp`.
 
 # RocksDB Filter Integration and Benchmarks
 
 Changes to the RocksDB source code can be grepping the tag `ProteusMod`. Since RockDB ["does not report false positive rate for prefix in seeks"](https://github.com/facebook/rocksdb/issues/3680#issuecomment-384786975), we implement custom range query FPR statistics recording. Note that this is only valid for experiments that use forward iterators only, not for general purpose. We use RocksDB v6.20.3 for our benchmarks.
 
 ## Build RocksDB
-```
-cd rocksdb
-mkdir build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DWITH_LZ4=ON -DWITH_ZSTD=ON ..
-make -j$(nproc) filter_experiment
-```
 
-There may be some compilation errors for `hash.hpp` in SuRF code regarding implicit fall through. These can be easily rectified by adding `// fall through` to the relevant switch statements.
+	cd rocksdb
+	mkdir build && cd build
+	cmake -DCMAKE_BUILD_TYPE=Release -DWITH_LZ4=ON -DWITH_ZSTD=ON ..
+	make -j$(nproc) filter_experiment
+
+## Run RocksDB Experiments
+
+	cd Proteus/bench
+	./rocksdb.sh rocksdb_experiment
+
